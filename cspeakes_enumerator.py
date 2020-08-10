@@ -1,14 +1,13 @@
 # Author: Chris Speakes
 # Email: 13alvone@gmail.com
 
+import re
 import os
 import sys
 import time
 import math
+import requests
 
-# PRE CONFIGURATION ==================================================================
-suppression = ' >/dev/null 2>&1'                            # Suppression, change if needed
-rootWordlistPath = '/root/HACK_TOOLS/cspeakes_wordlists/'   # Change to proper directory
 
 # IF NO ARGS =========================================================================
 if len(sys.argv) != 2:
@@ -16,328 +15,325 @@ if len(sys.argv) != 2:
     exit(0)
 
 # STATIC VARS ========================================================================
+suppression = ' >/dev/null 2>&1'  # Suppression, change if needed
+suppression_list = ['masscan', 'dotdotpwn', ]
+disabled_cmd_list = ['dotdotpwn', ]
+wordlist_repo = '/root/HACK_TOOLS/cspeakes_wordlists/'  # Change to proper directory
 original_start_time = time.time()
-command_list = []
+output_summary = []
+nic = 'eth1'
 ip = sys.argv[1]
+rpc_port = 111
+http_port = 80
+https_port = 443
+http_socket = 'http://' + str(ip) + ':' + str(http_port)
+http_filename = http_socket.replace('http://', '').replace('//', '').replace('/', '-')
+https_socket = 'https://' + str(ip) + ':' + str(https_port)
+https_filename = https_socket.replace('https://', '').replace('//', '').replace('/', '-')
+disable_list = [
+    'http_dirb_long',
+    'https_dirb_long',
+]
+
+# SERVICE / PORT DEFINITIONS =========================================================
+service_dict = {
+    'initial' : 'initial',
+    '21' : 'ftp',
+    '22' : 'ssh',
+    '25' : 'smtp',
+    '80' : 'http',
+    '110' : 'pop',
+    '111' : 'rpc',
+    '139' : 'smb',
+    '161' : 'snmp',
+    '443' : 'https',
+    '445' : 'smb',
+    '1521' : 'oracle',
+    '3306' : 'mysql',
+}
+
+
+# COMMAND SETS =======================================================================
+def generate_command_dict():
+    global ip, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
+    global wordlist_repo, nic
+    _ip = ip
+    _rpc_port = rpc_port
+    _http_port = http_port
+    _https_port = https_port
+    _http_socket = http_socket
+    _https_socket = https_socket
+    _http_filename = http_filename
+    _https_filename = https_filename
+    _wordlist_repo = wordlist_repo
+    command_sets_dict= {
+        'initial' : [
+            ['nmap', 'nmap_nse_scripts', 'masscan', ],
+            'nmap -sC -sV -O -A ' + str(_ip) + ' >> nmap_' + str(_ip),
+            'nmap -p1-65535 ' + str(_ip) + ' >> nmap_' + str(_ip),
+            'masscan -p1-65535,U:1-65535 ' + str(_ip) + ' --rate=1000 -e ' + str(nic) + ' -oL masscan_' + str(_ip),
+        ],
+
+        'ftp' : [
+            ['nmap', 'nmap_nse_scripts', ],
+            'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,' \
+                'ftp-vuln-cve2010-4221,tftp-enum -p 21 ' + str(_ip) + ' >> ftp_' + str(_ip),
+        ],
+
+        'smtp' : [
+            ['nmap', 'nmap_nse_scripts', ],
+            'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,' \
+                'smtp-vuln-cve2011-1764 -p 25 ' + str(_ip) + ' >> smtp_' + str(_ip),
+        ],
+
+        'http' : [
+            ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
+            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/small.txt -x ' + str(_wordlist_repo) +
+                '/extensions.txt -r -l -S -i -f -o dirb_' + str(_http_filename),
+            'dotdotpwn -d 6 -m http -h ' + str(ip) + ' -x ' + str(_http_port) + ' -b -q -r dotdotpwn_' +
+                str(_http_filename),
+            'nikto -h ' + str(_http_socket.split(':')[0]) + ' -output nikto_' + str(_http_filename) + '.txt',
+            'gobuster dir -u ' + str(_http_socket) + ' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                '-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o gobuster_2nd_run_' + str(_http_filename),
+        ],
+
+        'https': [
+            ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
+            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/small.txt -x ' + str(_wordlist_repo) +
+                '/extensions.txt -r -l -S -i -f -o dirb_' + str(_https_filename),
+            'dotdotpwn -d 6 -m http -h ' + str(_ip) + ' -x ' + str(_https_port) + ' -b -S -q -r dotdotpwn_' +
+                str(_https_filename),
+            'nikto -h ' + str(_https_socket.split(':')[0]) + ' -output nikto_' + str(_https_filename) + '.txt',
+            'gobuster dir -u ' + str(_https_socket) + ' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                '-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o gobuster_2nd_run_' + str(_https_filename),
+        ],
+
+        'cgi_bin': [
+            ['gobuster', 'wordlist_dirb_small' ],
+            'gobuster dir -u ' + str(_http_socket) + '/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt ' \
+                '-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 -o cgi-bin_' + str(http_filename),
+        ],
+
+        'http_dirb_long' : [
+            ['dirb', ],
+            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' + \
+                str(_wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(http_filename),
+        ],
+
+        'https_dirb_long': [
+            ['dirb', ],
+            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' + \
+            str(wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(https_filename),
+        ],
+
+        'rpc' : [
+            ['rpcinfo', ],
+            'rpcinfo -p ' + str(ip) + ' >> rpc_ ' + str(ip),
+        ],
+
+        'smb' : [
+            ['nmap', 'nmap_nse_scripts', 'nbtscan', 'enum4linux', 'samrdump.py', ],
+            'nbtscan -r ' + str(ip) + ' >> smb_' + str(ip),
+            'enum4linux -a ' + str(ip) + ' >> smb_' + str(ip),
+            'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 ' + str(ip) + ' >> smb_' + str(ip),
+            'python /usr/share/doc/python-impacket/examples/samrdump.py ' + str(ip) + ' >> smb_' + str(ip),
+            'nmap ' + str(ip) + ' --script smb-enum-domains.nse,smb-enum-groups.nse,smb-enum-processes.nse,'
+                'smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,smb-mbenum.nse,'
+                'smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,smb-server-stats.nse,'
+                'smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,'
+                'smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,'
+                'smb-vuln-regsvc-dos.nse >> smb_' + str(ip),
+        ],
+
+        'snmp' : [
+            ['snmpwalk', 'snmpcheck', 'onesixtyone', ],
+            'snmpwalk -c public -v1 ' + str(ip) + ' >> snmp_' + str(ip),
+            'snmpcheck -t ' + str(ip) + ' -c public >> -a snmp_' + str(ip),
+            'onesixtyone ' + str(ip) + ' public >> -a snmp_' + str(ip),
+        ],
+
+        'oracle' : [
+            ['tnscmd10g', ],
+            'tnscmd10g version -h ' + str(ip) + ' >> oracle' + str(ip),
+            'tmscmd10g status -h ' + str(ip) + ' >> oracle' + str(ip),
+        ],
+
+        'mysql' : [
+            ['nmap', 'nmap_nse_scripts'],
+            'nmap -sV -Pn -vv ' + str(ip) + ' -p 3306 --script mysql-audit,mysql-databases,'
+                'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,' \
+                'mysql-variables,mysql-vuln-cve2012-2122 >> mysql_' + str(ip),
+        ],
+
+        'ssh' : [
+            ['sslyze', 'tlssled', ],
+            'sslyze --regular ' + str(_https_socket).replace('https://', '') + ' >> sslyze_' + str(_https_filename),
+            'tlssled ' + str(ip) + ' ' + str(_https_port) + ' >> tlssled_' + str(_https_filename),
+        ]
+    }
+    return command_sets_dict
+
+
+# SOCKET UPDATER =====================================================================
+def socket_updater(new_ip, new_port):
+    global ip, http_port, https_port
+    ip = new_ip
+    http_port = new_port
+    https_port = new_port
 
 
 # TIME UPDATER =======================================================================
 def print_elapsed_time():
-    global original_start_time
+    global original_start_time, output_summary
     seconds = round(int(time.time() - original_start_time), 2)
     minutes = math.trunc(seconds / 60)
     remaining_seconds = math.trunc(seconds - (minutes * 60))
     if len(str(remaining_seconds)) != 2:
         remaining_seconds = '0' + str(remaining_seconds)
     elapsed_time = str(minutes) + ':' + str(remaining_seconds)
-    print('Time Elapsed: ' + elapsed_time)
+    msg = '**** Total_Time Elapsed: ' + elapsed_time + '=========================\n\n'
+    output_summary.append(msg)
+    print(msg)
 
 
-# BOILER-PLATE FOR ALL TARGETS =======================================================
-def all_tests_engage(ip):
-    global command_list
-    print('Started Script! Please Be Patient...')
-    start_time = time.time()
-    pre_cmd0 = 'nmap -sC -sV -O -A ' + str(ip) + ' >> nmap_' + str(ip)
-    pre_cmd1 = 'nmap -p1-65535 ' + str(ip) + ' >> nmap_' + str(ip)
-    pre_cmd2 = 'masscan -p1-65535,U:1-65535 ' + str(ip) + ' --rate=1000 -e tun0 -oL masscan_' + str(ip)
-    command_list.append('[STEP 1] - Do some initial recon: ')
+# HTTP(S) SOCKET EXTRACTER & TESTER ==================================================
+def get_live_http_sockets(ip, port_list):
+    live_http_socket_list = []
+    for port in port_list:
+        _http_socket = 'http://' + str(ip) + ':' + str(port)
+        _https_socket = 'https://' + str(ip) + ':' + str(port)
+        try:
+            http_response = requests.get(_http_socket)
+            http_status = http_response.status_code
+            if http_status == 200:
+                live_http_socket_list.append(_http_socket)
+        except:
+            pass
+        try:
+            https_response = requests.get(_https_socket)
+            https_status = https_response.status_code
+            if https_status == 200:
+                live_http_socket_list.append(_https_socket)
+        except:
+            pass
+    return live_http_socket_list
 
-    try:
-        os.system(pre_cmd0)
-        print('1. nmap 1 == Complete!')
-        print_elapsed_time()
-        command_list.append('[+] Initial nmap targeting all services and '
-                            'all version checks for all ports found completed.')
-        command_list.append(pre_cmd0)
-    except:
-        print('1. nmap 1 == Failed')
-        print_elapsed_time()
-    try:
-        os.system('echo "====================\n" >> nmap_' + str(ip))
-        os.system(pre_cmd1)
-        print('2. nmap ALL == Complete!')
-        print_elapsed_time()
-        command_list.append('[+] Secondary nmap targeting all ports completed.')
-        command_list.append(pre_cmd1)
-    except:
-        print('2. nmap ALL == Failed')
-        print_elapsed_time()
-    try:
-        os.system(pre_cmd2 + suppression)
-        print('3. masscan == Complete!')
-        print_elapsed_time()
-        command_list.append('[+] Last port scan completed with masscan checking all UDP ports as well.')
-    except:
-        print('3. masscan == Failed')
-        print_elapsed_time()
 
-    # GET PORTS OPEN ====================================================================
+def execute_os_command(os_cmds):
+    global suppression, suppression_list, output_summary, disabled_cmd_list
+    for os_cmd in os_cmds:
+        for cmd in suppression_list:
+            if cmd in os_cmd:
+                os_cmd = os_cmd + suppression
+        try:
+            flag = 0
+            for disabled_cmd in disabled_cmd_list:
+                if disabled_cmd in os_cmd:
+                    flag = 1
+            if flag != 1:
+                msg = '[+] ' + str(os_cmd) + '\n'
+                output_summary.append(msg)
+                print(msg)
+                os.system(os_cmd)
+                msg = '[+] Completed Successfully!\n'
+                output_summary.append(msg)
+                print(msg)
+                print_elapsed_time()
+        except:
+            msg = '[+] ' + str(os_cmd) + '\n[-] Failed!\n'
+            output_summary.append(msg)
+            print(msg)
+            print_elapsed_time()
+
+
+def get_live_ports(ip):
     file_name = 'nmap_' + str(ip)
     file_in = open(file_name, 'r')
-    http_flag = 0
-    flag = 0
     port_list = []
 
     for line in file_in:
-        if "====================" in line:
-            http_flag = 1
-        if 'PORT' in line and http_flag == 1:
-            flag = 1
-        elif 'Nmap' in line or line == '' or line == '\n':
-            flag = 0
-        elif flag == 1 and http_flag == 1:
-            x = line.split('/')
-            port_list.append(x[0])
-    print('|||||||||||||||||||||||||||||||||||||||')
-    print('**** Open Ports Detected: ')
-    print('|||||||||||||||||||||||||||||||||||||||')
-    command_list.append('[+] The following ports were reported as open or filtered.')
+        x = str(line)
+        y = re.match('(\d+\/)s*(tcp|udp|sctp)', line)
+        try:
+            result_tuple = y.groups()
+            port = result_tuple[0].replace('/', '')
+            if port not in port_list:
+                port_list.append(port)
+        except:
+            pass
+
+    msg = '||||||||||||||||||||||||||\n****Open Ports Detected:\n||||||||||||||||||||||||||\n'
     for port in port_list:
-        print(port)
-        command_list.append(str(port))
+        msg += str(port) + '\n'
 
-    # PORT-SPECIFIC SCANS ===============================================================
-    # PORT 21 ===========================================================================
-    ftp_cmd0 = 'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,' \
-               'ftp-vuln-cve2010-4221,tftp-enum -p 21 ' + str(ip) + ' | tee ftp_' + str(ip)
-    command_list.append(ftp_cmd0)
+    output_summary.append(msg)
+    print(msg)
 
-    if '21' in port_list:
-        print('TESTING PORT 21:')
-        try:
-            os.system(ftp_cmd0)
-            print('ftp_nmap_special == Complete!')
-            print_elapsed_time()
-        except:
-            print('ftp_nmap_special == Failed')
-            print_elapsed_time()
+    return port_list
 
-    # PORT 25 ==========================================================================
-    smtp_cmd0 = 'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,' \
-                'smtp-vuln-cve2011-1764 -p 25 ' + str(ip) + ' | tee smtp_' + str(ip)
 
-    if '25' in port_list:
-        print('TESTING PORT 25')
+def test_situation(port):
+    global service_dict, output_summary, wordlist_repo, suppression_list
+    command_sets = generate_command_dict()
+    try:
+        situation = str(service_dict[port])
         try:
-            os.system(smtp_cmd0)
-            print('smtp_nmap_special == Complete!')
-            print_elapsed_time()
+            tool_list = command_sets[situation][0]
+            cmd_list = command_sets[situation][1:]
+            msg = '[' + situation.upper() + '] - Testing with tool(s): ' + ', '.join(tool_list) + '\n'
+            output_summary.append(msg)
+            print(msg)
+            try:
+                execute_os_command(cmd_list)
+            except:
+                msg = '[-] - Execution of the [' + situation.upper() + '] command set failed.\n'
+                output_summary.append(msg)
+                print(msg)
         except:
-            print('smtp_nmap_special == Failed')
-            print_elapsed_time()
+            msg = '[-] No command_set module defined for ' + situation.upper() + '\n'
+            output_summary.append(msg)
+            print(msg)
+    except:
+        msg = '[-] No port service defined in service_dict for : ' + str(port) + '\n'
+        output_summary.append(msg)
+        print(msg)
 
-    # PORT 80 ====================================================================
-    # Http checks involve dirb, dotdotpwn(disabled by default), nikto, and gobuster tests
-    # longer version is disabled by default. Uncomment the two lines below to enable LONG check.
-    #http_cmd0 = 'dirb http://' + str(ip) + ' /usr/share/wordlists/dirb/common.txt -x ' + \
-    #            str(rootWordlistPath) + '/extensions.txt -r -l -i -f -o dirb_' + str(ip)   # LONG VERSION
-    http_cmd0 = 'dirb http://' + str(ip) + ' /usr/share/wordlists/dirb/small.txt -x ' \
-                + str(rootWordlistPath) + '/extensions.txt -r -l -i -f -o dirb_' + str(ip)  # SHORTER OPTION
-    http_cmd1 = 'dotdotpwn -d 6 -m http -h ' + str(ip) + ' -b -q -r dotdotpwn_' + str(ip)
-    http_cmd2 = 'nikto -h ' + str(ip) + ' -output nikto_' + str(ip) + '.txt'
-    http_cmd3 = 'gobuster dir -u http://' + str(ip) + '/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt ' \
-                                                      '-s 302,307,200,204,301,403 -x sh,pl,py,ps1 ' \
-                                                      '-t 150 -o cgi-bin_' + str(ip)
-    http_cmd4 = 'gobuster dir -u http://' + str(ip) + ' -w /usr/share/wordlists/dirbuster' \
-                                                      '/directory-list-2.3-medium.txt -t 150 -x php ' \
-                                                      '-s "200,204,301,302,307,403,401" ' \
-                                                      '-o gobuster_2nd_run_' + str(ip)
-    command_list.append('Attempting the following commands: \n[+] ')
 
-    if '80' in port_list or '8080' in port_list:
-        command_list.append(http_cmd1 + '\n[+]')
-        print('TESTING PORT 80')
-        try:
-            os.system(http_cmd0 + suppression)
-            command_list.append(http_cmd0 + '\nOR\n')
-            command_list.append(http_cmd1 + '\n[+]')
-            print('dirb == Complete!')
-            print_elapsed_time()
-            temp_file = open('dirb_' + str(ip), 'r')
-            temp_flag = 0
-            for line in temp_file:
-                if '/cgi-bin/' in line:
-                    temp_flag = 1
-            temp_file.close()
-            if temp_flag == 1:
-                try:
-                    os.system(http_cmd3 + suppression)
-                    command_list.append(http_cmd3 + '\n[+]')
-                    print('cgi-bin gobuster scan == Complete!')
-                    print_elapsed_time()
-                except:
-                    print('cgi-bin gobuster scan == Failed')
-                    print_elapsed_time()
-        except:
-            print('dirb == Failed')
-            print_elapsed_time()
-        try:
-            os.system(http_cmd2 + suppression)
-            command_list.append(http_cmd2 + '\n[+]')
-            print('nikto == Complete!')
-            print_elapsed_time()
-        except:
-            print('nikto == Failed')
-            print_elapsed_time()
-        try:
-            os.system(http_cmd4 + suppression)
-            command_list.append(http_cmd4 + '\n[+]')
-            print('gobuster == Complete!')
-            print_elapsed_time()
-        except:
-            print('gobuster == Failed')
-            print_elapsed_time()
+def get_live_urls(port_list):
+    global output_summary, ip
+    url_list = get_live_http_sockets(ip, port_list)
+    if len(url_list) != 0:
+        msg = '||||||||||||||||||||||||||\n****HTTP Live Sockets:\n||||||||||||||||||||||||||\n'
+        for url in url_list:
+            msg +='[+] ' + str(url) + '\n'
+        output_summary.append(msg)
+        print(msg)
+    elif len(url_list) == 0:
+        msg = '[-] No Additional HTTP(S) SOCKETS IDENTIFIED.\n'
+        output_summary.append(msg)
+        print(msg)
+    return url_list
 
-    # PORT 111 ===================================================================
-    rpc_cmd0 = 'rpcinfo -p ' + str(ip) + ' | tee rpcinfo_' + str(ip)
 
-    if '111' in port_list:
-        print('TESTING PORT 111')
-        try:
-            os.system(rpc_cmd0)
-            command_list.append(rpc_cmd0 + '\n[+]')
-            print('rpcinfo == Complete!')
-            print_elapsed_time()
-        except:
-            print('rpcinfo == Failed')
-            print_elapsed_time()
-
-    # PORT 139, 445  =============================================================
-    smb_cmd0 = 'nbtscan -r ' + str(ip) + ' | tee smb_' + str(ip)
-    smb_cmd1 = 'enum4linux -a ' + str(ip) + ' | tee -a smb_' + str(ip)
-    smb_cmd2 = 'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 ' + str(ip) + ' | tee -a smb_' + str(ip)
-    smb_cmd3 = 'python /usr/share/doc/python-impacket/examples/samrdump.py ' + str(ip) + ' | tee -a smb_' + str(ip)
-    smb_cmd4 = 'nmap ' + str(ip) + ' --script smb-enum-domains.nse,smb-enum-groups.nse,' \
-                                   'smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,' \
-                                   'smb-enum-users.nse,smb-ls.nse,smb-mbenum.nse,smb-os-discovery.nse,' \
-                                   'smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,' \
-                                   'smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,' \
-                                   'smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,' \
-                                   'smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,' \
-                                   'smb-vuln-regsvc-dos.nse | tee -a smb_' + str(ip)
-
-    if '139' in port_list or '445' in port_list:
-        print('TESTING PORT 139/445')
-        try:
-            os.system(smb_cmd0)
-            command_list.append(smb_cmd0 + '\n[+]')
-            print('nbtscan == Complete!')
-            print_elapsed_time()
-        except:
-            print('nbtscan == Failed')
-            print_elapsed_time()
-        try:
-            os.system(smb_cmd1)
-            command_list.append(smb_cmd1 + '\n[+]')
-            print('enum4linux == Complete!')
-            print_elapsed_time()
-        except:
-            print('enum4linux == Failed')
-            print_elapsed_time()
-        try:
-            os.system(smb_cmd2)
-            command_list.append(smb_cmd2 + '\n[+]')
-            print('smb_nmap == Complete!')
-            print_elapsed_time()
-        except:
-            print('smb_nmap == Failed')
-            print_elapsed_time()
-        try:
-            os.system(smb_cmd3)
-            command_list.append(smb_cmd3 + '\n[+]')
-            print('smb_python_dump == Complete!')
-            print_elapsed_time()
-        except:
-            print('smb_python_dump == Failed')
-            print_elapsed_time()
-        try:
-            os.system(smb_cmd4)
-            command_list.append(smb_cmd4 + '\n[+]')
-            print('smb_nmap == Complete!')
-            print_elapsed_time()
-        except:
-            print('smb_nmap == Failed')
-            print_elapsed_time()
-
-    # PORT 161 ===================================================================
-    snmp_cmd0 = 'snmpwalk -c public -v1 ' + str(ip) + ' | tee snmp_' + str(ip)
-    snmp_cmd1 = 'snmpcheck -t ' + str(ip) + ' -c public | tee -a snmp_' + str(ip)
-    snmp_cmd2 = 'onesixtyone ' + str(ip) + ' public | tee -a snmp_' + str(ip)
-
-    if '161' in port_list:
-        print('TESTING PORT 161:')
-        try:
-            os.system(snmp_cmd0)
-            command_list.append(snmp_cmd0 + '\n[+]')
-            print('snmpwalk == Complete!')
-            print_elapsed_time()
-        except:
-            print('snmpwalk == Failed')
-            print_elapsed_time()
-        try:
-            os.system(snmp_cmd1)
-            command_list.append(snmp_cmd1 + '\n[+]')
-            print('snmpcheck == Complete!')
-            print_elapsed_time()
-        except:
-            print('snmpcheck == Failed')
-            print_elapsed_time()
-        try:
-            os.system(snmp_cmd2)
-            command_list.append(snmp_cmd2 + '\n[+]')
-            print('onesixtyone == Complete!')
-            print_elapsed_time()
-        except:
-            print('onesixtyone == Failed')
-            print_elapsed_time()
-
-    # PORT 1521 ==================================================================
-    oracle_cmd0 = 'tnscmd10g version -h ' + str(ip) + ' | tee oracle' + str(ip)
-    oracle_cmd1 = 'tmscmd10g status -h ' + str(ip) + ' | tee -a oracle' + str(ip)
-
-    if '1521' in port_list:
-        print('TESTING PORT 1524:')
-        try:
-            os.system(oracle_cmd0)
-            command_list.append(oracle_cmd0 + '\n[+]')
-            print('tnscmd10g == Complete!')
-            print_elapsed_time()
-        except:
-            print('tnscmd10g == Failed')
-            print_elapsed_time()
-        try:
-            os.system(oracle_cmd1)
-            command_list.append(oracle_cmd0 + '\n[+]')
-            print('tnscmd10g 2 == Complete!')
-            print_elapsed_time()
-        except:
-            print('tnscmd10g 2 == Failed')
-            print_elapsed_time()
-
-    # PORT 3306 ==================================================================
-    mysql_cmd0 = 'nmap -sV -Pn -vv ' + str(ip) + ' -p 3306 --script mysql-audit,mysql-databases,' \
-                                                 'mysql-dump-hashes,mysql-empty-password,' \
-                                                 'mysql-enum,mysql-info,mysql-query,mysql-users,' \
-                                                 'mysql-variables,mysql-vuln-cve2012-2122 ' \
-                                                 '| tee mysql_' + str(ip)
-
-    if '3306' in port_list:
-        print('TESTING PORT 3306:')
-        try:
-            os.system(mysql_cmd0)
-            command_list.append(mysql_cmd0 + '\n[+]')
-            print('mysql_nmap == Complete!')
-            print_elapsed_time()
-        except:
-            print('mysql_nmap == Failed')
-            print_elapsed_time()
+def main():
+    global ip, output_summary
+    command_sets = generate_command_dict()
+    print('Started Script! Please Be Patient...\n[+] TARGET: ' + str(ip) + '\n')
+    test_situation('initial')
+    _port_list = get_live_ports(ip)
+    _url_list = get_live_urls(_port_list)
+    if len(_url_list) != 0:
+        for _url in _url_list:
+            socket_updater(ip, _url.split(':')[1])
+            test_situation('80')
+    for _port in _port_list:
+        if _port != 80:
+            test_situation(_port)
+    f_out = open('summary_' + str(ip), 'w' )
+    for summary_line in output_summary:
+        f_out.write(summary_line)
+    f_out.close()
 
 
 if __name__ == '__main__':
-    all_tests_engage(ip)
-    file_name = 'command_summary_' + str(ip)
-    f_out = open(file_name, 'w')
-    for item in command_list:
-        f_out.write(item)
-    f_out.close()
+    main()
