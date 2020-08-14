@@ -38,6 +38,7 @@ disable_list = [
 # SERVICE / PORT DEFINITIONS =========================================================
 service_dict = {
     'initial' : 'initial',
+    'wordlist' : 'wordlist',
     '21' : 'ftp',
     '22' : 'ssh',
     '25' : 'smtp',
@@ -76,13 +77,13 @@ def generate_command_dict():
 
         'ftp' : [
             ['nmap', 'nmap_nse_scripts', ],
-            'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,' \
+            'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,'
                 'ftp-vuln-cve2010-4221,tftp-enum -p 21 ' + str(_ip) + ' >> ftp_' + str(_ip),
         ],
 
         'smtp' : [
             ['nmap', 'nmap_nse_scripts', ],
-            'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,' \
+            'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,'
                 'smtp-vuln-cve2011-1764 -p 25 ' + str(_ip) + ' >> smtp_' + str(_ip),
         ],
 
@@ -110,20 +111,20 @@ def generate_command_dict():
 
         'cgi_bin': [
             ['gobuster', 'wordlist_dirb_small' ],
-            'gobuster dir -u ' + str(_http_socket) + '/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt ' \
+            'gobuster dir -u ' + str(_http_socket) + '/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt '
                 '-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 -o cgi-bin_' + str(http_filename),
         ],
 
         'http_dirb_long' : [
             ['dirb', ],
-            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' + \
+            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' +
                 str(_wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(http_filename),
         ],
 
         'https_dirb_long': [
             ['dirb', ],
-            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' + \
-            str(wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(https_filename),
+            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' +
+                str(wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(https_filename),
         ],
 
         'rpc' : [
@@ -169,7 +170,12 @@ def generate_command_dict():
             ['sslyze', 'tlssled', ],
             'sslyze --regular ' + str(_https_socket).replace('https://', '') + ' >> sslyze_' + str(_https_filename),
             'tlssled ' + str(ip) + ' ' + str(_https_port) + ' >> tlssled_' + str(_https_filename),
-        ]
+        ],
+
+        'wordlist' : [
+            ['cewl', ],
+            'cewl -m 5 -v -d 6 -o ' + str(_http_socket) + ' >> custom_wordlist_' + str(_ip),
+        ],
     }
     return command_sets_dict
 
@@ -191,7 +197,7 @@ def print_elapsed_time():
     if len(str(remaining_seconds)) != 2:
         remaining_seconds = '0' + str(remaining_seconds)
     elapsed_time = str(minutes) + ':' + str(remaining_seconds)
-    msg = '**** Total_Time Elapsed: ' + elapsed_time + '=========================\n\n'
+    msg = '**** Total_Time Elapsed: ' + elapsed_time + ' =======================\n\n'
     output_summary.append(msg)
     print(msg)
 
@@ -315,8 +321,65 @@ def get_live_urls(port_list):
     return url_list
 
 
+def generate_custom_wordlist():
+    global http_socket, ip, http_port
+    filename_list = []
+    http_list = []
+    final_wordlist = []
+
+    for root, dirs, files in os.walk("."):
+        for filename in files:
+            if re.match('dirb_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename) or re.match('gobuster_', filename):
+                filename_list.append(filename)
+
+    for filename in filename_list:
+        f_open = open(filename, 'r')
+        if 'dirb_' in filename:
+            for line in f_open:
+                if re.match('^(http|https)://', line):
+                    http_line_cleaned = line.split(' ')
+                    for clean_http_line in http_line_cleaned:
+                        if re.match('^(http|https)://', clean_http_line):
+                            http_list.append(clean_http_line)
+            f_open.close()
+
+        if 'gobuster_' in filename:
+            for line in f_open:
+                http_list.append('http://' + str(ip) + '/' + str(line.split(' ')[0]))
+                http_list.append('https://' + str(ip) + '/' + str(line.split(' ')[0]))
+            f_open.close()
+
+    for http_addr in http_list:
+        http_socket = http_addr
+        socket_updater(ip, http_port)
+        test_situation('wordlist')
+
+    for root, dirs, files in os.walk("."):
+        for filename in files:
+            if re.match('custom_wordlist_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename):
+                wordlist_location = filename
+                f_open = open(wordlist_location, 'r')
+                start_flag = 0
+                for line in f_open:
+                    if line == 'Words found\n' or line == 'Words found':
+                        start_flag = 1
+                    if start_flag == 1 and line != '\n' and line != '':
+                        _word = line.split(' ')[0]
+                        if _word not in final_wordlist:
+                            final_wordlist.append(_word)
+                    if start_flag == 1 and (line == '\n' or line == ''):
+                        start_flag = 0
+                f_open.close()
+
+    f_open = open(wordlist_location, 'r+')
+    f_open.truncate(0)
+    for word in final_wordlist:
+        f_open.write(word)
+    f_open.close()
+
+
 def main():
-    global ip, output_summary
+    global ip, http_socket, output_summary
     command_sets = generate_command_dict()
     print('Started Script! Please Be Patient...\n[+] TARGET: ' + str(ip) + '\n')
     test_situation('initial')
@@ -329,10 +392,11 @@ def main():
     for _port in _port_list:
         if _port != 80:
             test_situation(_port)
-    f_out = open('summary_' + str(ip), 'w' )
+    f_out = open('summary_' + str(ip), 'w')
     for summary_line in output_summary:
         f_out.write(summary_line)
     f_out.close()
+    generate_custom_wordlist()
 
 
 if __name__ == '__main__':
