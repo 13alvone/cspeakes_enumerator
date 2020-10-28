@@ -1,35 +1,53 @@
 # Author: Chris Speakes
 # Email: 13alvone@gmail.com
-
 import re
 import os
-import sys
 import time
 import math
-import requests
+import logging
+import argparse
+import subprocess
+import urllib.request
 
 
-# IF NO ARGS =========================================================================
-if len(sys.argv) != 2:
-    print('Usage: cspeakes_enumerator.py <ip>')
-    exit(0)
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--ip', help='Target IP Address', default='BLANK', type=str, required=True)
+    parser.add_argument('-n', '--nic', help='Target HTTP Port', default='eth1', type=str, required=False)
+    parser.add_argument('-hp', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
+    parser.add_argument('-hps', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
+    parser.add_argument('-rpc', '--rpc_port', help='Target RPC Port', default=111, type=int, required=False)
+    parser.add_argument('-s', '--scan_type', help='Scan Speed: [`long` or `short`]', default='short', type=str,
+                        required=False)
+    parser.add_argument('-c', '--command_timeout', help='Command Timeout [Default = 600 seconds]', default=111,
+                        type=int, required=False)
+    arguments = parser.parse_args()
+    return arguments
+
 
 # STATIC VARS ========================================================================
-suppression = ' >/dev/null 2>&1'  # Suppression, change if needed
+wordlist_repo = '/root/HACK_TOOLS/cspeakes_wordlists'   # Change to proper directory
+suppression = ' >/dev/null 2>&1'  # suppression, change if needed
 suppression_list = ['masscan', 'dotdotpwn', ]
 disabled_cmd_list = ['dotdotpwn', ]
-wordlist_repo = '/root/HACK_TOOLS/cspeakes_wordlists/'  # Change to proper directory
-original_start_time = time.time()
-output_summary = []
-nic = 'eth1'
-ip = sys.argv[1]
-rpc_port = 111
-http_port = 80
-https_port = 443
-http_socket = 'http://' + str(ip) + ':' + str(http_port)
+args = parse_args()
+command_timeout = args.command_timeout
+scan_type = args.scan_type
+ip = args.ip
+nic = args.nic
+rpc_port = args.rpc_port
+http_port = args.http_port
+https_port = args.https_port
+http_socket = f'http://{ip}:{http_port}'
 http_filename = http_socket.replace('http://', '').replace('//', '').replace('/', '-')
-https_socket = 'https://' + str(ip) + ':' + str(https_port)
+https_socket = f'https://{ip}:{https_port}'
 https_filename = https_socket.replace('https://', '').replace('//', '').replace('/', '-')
+original_start_time = time.time()
+current_process_time = time.time()
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+current_cmd_list = {}
+output_summary = []
 disable_list = [
     'http_dirb_long',
     'https_dirb_long',
@@ -37,20 +55,20 @@ disable_list = [
 
 # SERVICE / PORT DEFINITIONS =========================================================
 service_dict = {
-    'initial' : 'initial',
-    'wordlist' : 'wordlist',
-    '21' : 'ftp',
-    '22' : 'ssh',
-    '25' : 'smtp',
-    '80' : 'http',
-    '110' : 'pop',
-    '111' : 'rpc',
-    '139' : 'smb',
-    '161' : 'snmp',
-    '443' : 'https',
-    '445' : 'smb',
-    '1521' : 'oracle',
-    '3306' : 'mysql',
+    'initial': 'initial',
+    'wordlist': 'wordlist',
+    '21': 'ftp',
+    '22': 'ssh',
+    '25': 'smtp',
+    '80': 'http',
+    '110': 'pop',
+    '111': 'rpc',
+    '139': 'smb',
+    '161': 'snmp',
+    '443': 'https',
+    '445': 'smb',
+    '1521': 'oracle',
+    '3306': 'mysql',
 }
 
 
@@ -58,124 +76,129 @@ service_dict = {
 def generate_command_dict():
     global ip, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_repo, nic
-    _ip = ip
-    _rpc_port = rpc_port
-    _http_port = http_port
-    _https_port = https_port
-    _http_socket = http_socket
-    _https_socket = https_socket
-    _http_filename = http_filename
-    _https_filename = https_filename
-    _wordlist_repo = wordlist_repo
-    command_sets_dict= {
-        'initial' : [
-            ['nmap', 'nmap_nse_scripts', 'masscan', ],
-            'nmap -sC -sV -O -A ' + str(_ip) + ' >> nmap_' + str(_ip),
-            'nmap -p1-65535 ' + str(_ip) + ' >> nmap_' + str(_ip),
-            'masscan -p1-65535,U:1-65535 ' + str(_ip) + ' --rate=1000 -e ' + str(nic) + ' -oL masscan_' + str(_ip),
-        ],
+    command_sets_dict = {
+        'initial': {
+            'tools': ['nmap', 'nmap_nse_scripts', 'masscan', ],
+            'commands': {
+                f'nmap -sC -sV -O -A {ip} >> nmap_{ip}': ['LONG', 'SHORT'],
+                f'nmap -p1-65535 {ip} >> nmap_{ip}': ['LONG', 'SHORT'],
+                f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -e {nic} -oL masscan_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'ftp' : [
-            ['nmap', 'nmap_nse_scripts', ],
-            'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,'
-                'ftp-vuln-cve2010-4221,tftp-enum -p 21 ' + str(_ip) + ' >> ftp_' + str(_ip),
-        ],
+        'ftp': {
+            'tools': ['nmap', 'nmap_nse_scripts', ],
+            'commands': {
+                'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,'
+                f'ftp-vuln-cve2010-4221,tftp-enum -p 21 {ip} >> ftp_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'smtp' : [
-            ['nmap', 'nmap_nse_scripts', ],
-            'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,'
-                'smtp-vuln-cve2011-1764 -p 25 ' + str(_ip) + ' >> smtp_' + str(_ip),
-        ],
+        'smtp': {
+            'tools': ['nmap', 'nmap_nse_scripts', ],
+            'commands': {
+                f'nmap –script smtp-commands,smtp-enum-users,smtp-vuln-cve2010-4344,smtp-vuln-cve2011-1720,'
+                f'smtp-vuln-cve2011-1764 -p 25 {ip} >> smtp_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'http' : [
-            ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
-            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/small.txt -x ' + str(_wordlist_repo) +
-                '/extensions.txt -r -l -S -i -f -o dirb_' + str(_http_filename),
-            'dotdotpwn -d 6 -m http -h ' + str(ip) + ' -x ' + str(_http_port) + ' -b -q -r dotdotpwn_' +
-                str(_http_filename),
-            'nikto -h ' + str(_http_socket.split(':')[0]) + ' -output nikto_' + str(_http_filename) + '.txt',
-            'gobuster dir -u ' + str(_http_socket) + ' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
-                '-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o gobuster_2nd_run_' + str(_http_filename),
-        ],
+        'http': {
+            'tools': ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
+            'commands': {
+                f'dirb {http_socket} /usr/share/wordlists/dirb/small.txt -x {wordlist_repo}/extensions.txt '
+                f'-r -l -S -i -f -o dirb_{http_filename}': ['LONG', 'SHORT'],
+                f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q -r dotdotpwn_{http_filename}': ['LONG', 'SHORT'],
+                f'nikto -h {http_socket} -output nikto_{http_filename}.txt': ['LONG', 'SHORT'],
+                f'gobuster dir -u {http_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'gobuster_2nd_run_{http_filename}': ['LONG', 'SHORT'],
+                f'dirb {http_socket} /usr/share/wordlists/dirb/common.txt -x {wordlist_repo}/extensions.txt '
+                f'-r -l -S -i -f -o dirb_{http_filename}': ['LONG'],
+            }
+        },
 
-        'https': [
-            ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
-            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/small.txt -x ' + str(_wordlist_repo) +
-                '/extensions.txt -r -l -S -i -f -o dirb_' + str(_https_filename),
-            'dotdotpwn -d 6 -m http -h ' + str(_ip) + ' -x ' + str(_https_port) + ' -b -S -q -r dotdotpwn_' +
-                str(_https_filename),
-            'nikto -h ' + str(_https_socket.split(':')[0]) + ' -output nikto_' + str(_https_filename) + '.txt',
-            'gobuster dir -u ' + str(_https_socket) + ' -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
-                '-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o gobuster_2nd_run_' + str(_https_filename),
-        ],
+        'https': {
+            'tools': ['dirb', 'dotdotpwn', 'nikto', 'gobuster', ],
+            'commands': {
+                f'dirb {https_socket} /usr/share/wordlists/dirb/small.txt -x {wordlist_repo}/extensions.txt '
+                f'-r -l -S -i -f -o dirb_{https_filename}': ['LONG', 'SHORT'],
+                f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q -r '
+                f'dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
+                f'nikto -h {https_socket.split(":")[0]} -output nikto_{https_filename}.txt': ['LONG', 'SHORT'],
+                f'gobuster dir -u {https_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'gobuster_2nd_run_{https_filename}': ['LONG', 'SHORT'],
+                f'dirb {https_socket} /usr/share/wordlists/dirb/common.txt -x {wordlist_repo}/extensions.txt '
+                f'-r -l -S -i -f -o dirb_{https_filename}': ['LONG'],
+                f'sslyze --regular {https_socket.replace("https://", "")} >> '
+                f'sslyze_{https_filename}': ['LONG', 'SHORT'],
+                f'tlssled {ip} {https_port} >> tlssled_{https_filename}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'cgi_bin': [
-            ['gobuster', 'wordlist_dirb_small' ],
-            'gobuster dir -u ' + str(_http_socket) + '/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt '
-                '-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 -o cgi-bin_' + str(http_filename),
-        ],
+        'cgi_bin': {
+            'tools': ['gobuster', 'wordlist_dirb_small'],
+            'commands': {
+                f'gobuster dir -u {http_socket}/cgi-bin/ -w /usr/share/wordlists/dirb/small.txt '
+                f'-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 -o cgi-bin_{http_filename}': ['LONG', 'SHORT']
+            }
+        },
 
-        'http_dirb_long' : [
-            ['dirb', ],
-            'dirb ' + str(_http_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' +
-                str(_wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(http_filename),
-        ],
+        'rpc': {
+            'tools': ['rpcinfo', ],
+            'commands': {
+                f'rpcinfo -p {ip} >> rpc_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'https_dirb_long': [
-            ['dirb', ],
-            'dirb ' + str(_https_socket) + ' /usr/share/wordlists/dirb/common.txt -x ' +
-                str(wordlist_repo) + '/extensions.txt -r -l -S -i -f -o dirb_' + str(https_filename),
-        ],
+        'smb': {
+            'tools': ['nmap', 'nmap_nse_scripts', 'nbtscan', 'enum4linux', 'samrdump.py', ],
+            'commands': {
+                f'nbtscan -r {ip} >> smb_{ip}': ['LONG', 'SHORT'],
+                f'enum4linux -a {ip} >> smb_{ip}': ['LONG', 'SHORT'],
+                f'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} >> smb_{ip}': ['LONG', 'SHORT'],
+                f'python /usr/share/doc/python-impacket/examples/samrdump.py {ip} >> smb_{ip}': ['LONG', 'SHORT'],
+                f'nmap {ip} --script smb-enum-domains.nse,smb-enum-groups.nse,'
+                f'smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,'
+                f'smb-mbenum.nse,smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,'
+                f'smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,'
+                f'smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,'
+                f'smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse >> smb_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'rpc' : [
-            ['rpcinfo', ],
-            'rpcinfo -p ' + str(ip) + ' >> rpc_ ' + str(ip),
-        ],
+        'snmp': {
+            'tools': ['snmpwalk', 'snmpcheck', 'onesixtyone', ],
+            'commands': {
+                f'snmpwalk -c public -v1 {ip} >> snmp_{ip}': ['LONG', 'SHORT'],
+                f'snmpcheck -t {ip} -c public >> -a snmp_{ip}': ['LONG', 'SHORT'],
+                f'onesixtyone {ip} public >> -a snmp_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'smb' : [
-            ['nmap', 'nmap_nse_scripts', 'nbtscan', 'enum4linux', 'samrdump.py', ],
-            'nbtscan -r ' + str(ip) + ' >> smb_' + str(ip),
-            'enum4linux -a ' + str(ip) + ' >> smb_' + str(ip),
-            'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 ' + str(ip) + ' >> smb_' + str(ip),
-            'python /usr/share/doc/python-impacket/examples/samrdump.py ' + str(ip) + ' >> smb_' + str(ip),
-            'nmap ' + str(ip) + ' --script smb-enum-domains.nse,smb-enum-groups.nse,smb-enum-processes.nse,'
-                'smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,smb-mbenum.nse,'
-                'smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,smb-server-stats.nse,'
-                'smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,'
-                'smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,'
-                'smb-vuln-regsvc-dos.nse >> smb_' + str(ip),
-        ],
+        'oracle': {
+            'tools': ['tnscmd10g', ],
+            'commands': {
+                f'tnscmd10g version -h {ip} >> oracle{ip}': ['LONG', 'SHORT'],
+                f'tmscmd10g status -h {ip} >> oracle{ip}': ['LONG', 'SHORT'],
+            },
+        },
 
-        'snmp' : [
-            ['snmpwalk', 'snmpcheck', 'onesixtyone', ],
-            'snmpwalk -c public -v1 ' + str(ip) + ' >> snmp_' + str(ip),
-            'snmpcheck -t ' + str(ip) + ' -c public >> -a snmp_' + str(ip),
-            'onesixtyone ' + str(ip) + ' public >> -a snmp_' + str(ip),
-        ],
+        'mysql': {
+            'tools': ['nmap', 'nmap_nse_scripts'],
+            'commands': {
+                f'nmap -sV -Pn -vv {ip} -p 3306 --script mysql-audit,mysql-databases,'
+                f'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,'
+                f'mysql-variables,mysql-vuln-cve2012-2122 >> mysql_{ip}': ['LONG', 'SHORT'],
+            }
+        },
 
-        'oracle' : [
-            ['tnscmd10g', ],
-            'tnscmd10g version -h ' + str(ip) + ' >> oracle' + str(ip),
-            'tmscmd10g status -h ' + str(ip) + ' >> oracle' + str(ip),
-        ],
-
-        'mysql' : [
-            ['nmap', 'nmap_nse_scripts'],
-            'nmap -sV -Pn -vv ' + str(ip) + ' -p 3306 --script mysql-audit,mysql-databases,'
-                'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,' \
-                'mysql-variables,mysql-vuln-cve2012-2122 >> mysql_' + str(ip),
-        ],
-
-        'ssh' : [
-            ['sslyze', 'tlssled', ],
-            'sslyze --regular ' + str(_https_socket).replace('https://', '') + ' >> sslyze_' + str(_https_filename),
-            'tlssled ' + str(ip) + ' ' + str(_https_port) + ' >> tlssled_' + str(_https_filename),
-        ],
-
-        'wordlist' : [
-            ['cewl', ],
-            'cewl -m 5 -v -d 6 -o ' + str(_http_socket) + ' >> custom_wordlist_' + str(_ip),
-        ],
+        'wordlist': {
+            'tools': ['cewl', ],
+            'commands': {
+                f'cewl -m 5 -v -d 6 -o {http_socket} >> custom_wordlist_{ip}': ['LONG', 'SHORT'],
+            }
+        },
     }
     return command_sets_dict
 
@@ -197,112 +220,134 @@ def print_elapsed_time():
     if len(str(remaining_seconds)) != 2:
         remaining_seconds = '0' + str(remaining_seconds)
     elapsed_time = str(minutes) + ':' + str(remaining_seconds)
-    msg = '**** Total_Time Elapsed: ' + elapsed_time + ' =======================\n\n'
+    msg = '**** Total_Time Elapsed: ' + elapsed_time + '\n\n'
     output_summary.append(msg)
-    print(msg)
+    logger.warning(msg)
+    return time.time()
 
 
-# HTTP(S) SOCKET EXTRACTER & TESTER ==================================================
-def get_live_http_sockets(ip, port_list):
+# HTTP(S) SOCKET EXTRACTOR & TESTER ==================================================
+def get_live_http_sockets(_ip, port_list):
     live_http_socket_list = []
     for port in port_list:
-        _http_socket = 'http://' + str(ip) + ':' + str(port)
-        _https_socket = 'https://' + str(ip) + ':' + str(port)
+        _http_socket = f'http://{_ip}:{port}'
+        _https_socket = f'https://{_ip}:{port}'
         try:
-            http_response = requests.get(_http_socket)
-            http_status = http_response.status_code
-            if http_status == 200:
+            http_status = urllib.request.urlopen(_http_socket, timeout=10).getcode()
+            msg = f'[i] Testing HTTP Socket: {_http_socket}\n\t*** Result: {http_status}\n'
+            logger.warning(msg)
+            output_summary.append(msg)
+            if http_status == 200 or http_status == '200':
                 live_http_socket_list.append(_http_socket)
-        except:
-            pass
-        try:
-            https_response = requests.get(_https_socket)
-            https_status = https_response.status_code
-            if https_status == 200:
-                live_http_socket_list.append(_https_socket)
-        except:
-            pass
+
+        except Exception as e:
+            logger.warning(e)
+            continue
+        if port == '443' or port == '8443':
+            try:
+                https_status = urllib.request.urlopen(_https_socket, timeout=10).getcode()
+                msg = f'[i] Testing HTTPS Socket: {_https_socket}\n\t*** Result: {https_status}\n'
+                logger.warning(msg)
+                output_summary.append(msg)
+                if https_status == 200 or http_status == '200':
+                    live_http_socket_list.append(_https_socket)
+            except Exception as e:
+                logger.warning(e)
+                pass
     return live_http_socket_list
 
 
-def execute_os_command(os_cmds):
-    global suppression, suppression_list, output_summary, disabled_cmd_list
-    for os_cmd in os_cmds:
-        for cmd in suppression_list:
-            if cmd in os_cmd:
-                os_cmd = os_cmd + suppression
-        try:
-            flag = 0
-            for disabled_cmd in disabled_cmd_list:
-                if disabled_cmd in os_cmd:
-                    flag = 1
-            if flag != 1:
-                msg = '[+] ' + str(os_cmd) + '\n'
-                output_summary.append(msg)
-                print(msg)
-                os.system(os_cmd)
-                msg = '[+] Completed Successfully!\n'
-                output_summary.append(msg)
-                print(msg)
-                print_elapsed_time()
-        except:
-            msg = '[+] ' + str(os_cmd) + '\n[-] Failed!\n'
+def execute_os_command(_cmd):
+    global suppression, suppression_list, output_summary, disabled_cmd_list, command_timeout
+    output, error = None, None
+    for disabled_cmd in disabled_cmd_list:
+        if disabled_cmd in _cmd:
+            msg = f'[i] The following cmd failed to execute because it has been disabled.\n[i] See the ' \
+                  f'`disabled_cmd_list` to remove if required.\n{_cmd}\n\n'
+            logger.warning(msg)
             output_summary.append(msg)
-            print(msg)
-            print_elapsed_time()
+            return msg, msg
+    for flagged_cmd in suppression_list:
+        if flagged_cmd in _cmd:
+            _cmd = _cmd + suppression
+    try:
+        subprocess.run(_cmd, shell=True, timeout=command_timeout)
+        msg = f'[BASH #:] {_cmd}\n[+] Completed Successfully!\n'
+        output_summary.append(msg)
+        logger.warning(error)
+        print_elapsed_time()
+    except subprocess.TimeoutExpired as e:
+        msg_error = f'[!] Command Failure due to Excessive Timeout:\n[-] {_cmd}\n\n'
+        output_summary.append(msg_error)
+        logger.warning(e)
+        print_elapsed_time()
+    return output, error
 
 
-def get_live_ports(ip):
-    file_name = 'nmap_' + str(ip)
+def get_live_ports():
+    global ip
+    file_name = f'nmap_{ip}'
     file_in = open(file_name, 'r')
     port_list = []
-
     for line in file_in:
-        x = str(line)
         y = re.match('(\d+\/)s*(tcp|udp|sctp)', line)
-        try:
-            result_tuple = y.groups()
-            port = result_tuple[0].replace('/', '')
-            if port not in port_list:
-                port_list.append(port)
-        except:
-            pass
-
+        if y is not None:
+            try:
+                result_tuple = y.groups()
+                port = result_tuple[0].replace('/', '')
+                if port not in port_list:
+                    port_list.append(port)
+            except Exception as e:
+                logger.warning(e)
+                continue
     msg = '||||||||||||||||||||||||||\n****Open Ports Detected:\n||||||||||||||||||||||||||\n'
     for port in port_list:
-        msg += str(port) + '\n'
-
+        msg += f'{port}\n'
+    msg = msg + '\n'
     output_summary.append(msg)
-    print(msg)
-
+    logger.warning(msg)
     return port_list
 
 
-def test_situation(port):
-    global service_dict, output_summary, wordlist_repo, suppression_list
+def test_situation(port_str):
+    global service_dict, output_summary, wordlist_repo, suppression_list, scan_type
+    result = False
     command_sets = generate_command_dict()
     try:
-        situation = str(service_dict[port])
+        situation = f'{service_dict[port_str]}'
         try:
-            tool_list = command_sets[situation][0]
-            cmd_list = command_sets[situation][1:]
-            msg = '[' + situation.upper() + '] - Testing with tool(s): ' + ', '.join(tool_list) + '\n'
-            output_summary.append(msg)
-            print(msg)
+            tool_list = command_sets[situation]['tools']
             try:
-                execute_os_command(cmd_list)
-            except:
-                msg = '[-] - Execution of the [' + situation.upper() + '] command set failed.\n'
+                cmd_dict = command_sets[situation]['commands']
+                msg = f'[{situation.upper()}] - Testing with command(s): {", ".join(tool_list)}\n'
                 output_summary.append(msg)
-                print(msg)
-        except:
-            msg = '[-] No command_set module defined for ' + situation.upper() + '\n'
+                logger.warning(msg)
+                for cmd in cmd_dict:
+                    if scan_type.upper() in cmd_dict[cmd]:
+                        try:
+                            execute_os_command(cmd)
+                            result = True
+                        except Exception as e:
+                            msg = f'[-] - Execution of the [{situation.upper()}] command set failed.\n'
+                            output_summary.append(msg)
+                            logger.warning(msg)
+                    else:
+                        msg = f'[i] The following command has been disabled:\n[i] {cmd}'
+                        output_summary.append(msg)
+                        logger.warning(msg)
+            except Exception as e:
+                msg = f'[-] No `commands` module defined for {situation.upper()}\n'
+                output_summary.append(msg)
+                logger.warning(msg)
+        except Exception as e:
+            msg = f'[-] No `tools` module defined for {situation.upper()}\n'
             output_summary.append(msg)
-            print(msg)
-    except:
-        msg = '[-] No port service defined in service_dict for : ' + str(port) + '\n'
+            logger.warning(msg)
+    except Exception as e:
+        msg = f'[-] No port service defined in service_dict for : {port_str}\n'
         output_summary.append(msg)
-        print(msg)
+        logger.warning(msg)
+    return result
 
 
 def get_live_urls(port_list):
@@ -311,18 +356,19 @@ def get_live_urls(port_list):
     if len(url_list) != 0:
         msg = '||||||||||||||||||||||||||\n****HTTP Live Sockets:\n||||||||||||||||||||||||||\n'
         for url in url_list:
-            msg +='[+] ' + str(url) + '\n'
+            msg += f'[+] {url}\n'
+        msg = msg + '\n'
         output_summary.append(msg)
-        print(msg)
+        logger.warning(msg)
     elif len(url_list) == 0:
-        msg = '[-] No Additional HTTP(S) SOCKETS IDENTIFIED.\n'
+        msg = f'[-] No Additional HTTP(S) SOCKETS IDENTIFIED.\n'
         output_summary.append(msg)
-        print(msg)
+        logger.warning(msg)
     return url_list
 
 
 def generate_custom_wordlist():
-    global http_socket, ip, http_port
+    global ip, http_port, http_socket
     filename_list = []
     http_list = []
     final_wordlist = []
@@ -354,6 +400,7 @@ def generate_custom_wordlist():
         socket_updater(ip, http_port)
         test_situation('wordlist')
 
+    wordlist_location = ''
     for root, dirs, files in os.walk("."):
         for filename in files:
             if re.match('custom_wordlist_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename):
@@ -379,20 +426,26 @@ def generate_custom_wordlist():
 
 
 def main():
-    global ip, http_socket, output_summary
-    command_sets = generate_command_dict()
-    print('Started Script! Please Be Patient...\n[+] TARGET: ' + str(ip) + '\n')
+    global ip, output_summary, current_cmd_list
+    current_cmd_list = generate_command_dict()
+    logger.warning(f'Started Script! Please Be Patient...\n[+] TARGET: {ip}\n')
     test_situation('initial')
-    _port_list = get_live_ports(ip)
-    _url_list = get_live_urls(_port_list)
-    if len(_url_list) != 0:
-        for _url in _url_list:
-            socket_updater(ip, _url.split(':')[1])
-            test_situation('80')
-    for _port in _port_list:
-        if _port != 80:
-            test_situation(_port)
-    f_out = open('summary_' + str(ip), 'w')
+    port_list = get_live_ports()
+    url_list = get_live_urls(port_list)
+    initial_result = False
+    if len(url_list) != 0:
+        for url in url_list:
+            socket_updater(ip, url.split(':')[1])
+            if test_situation('80'):
+                initial_result = True
+    if initial_result:
+        for port in port_list:
+            if port != '80':
+                test_situation(port)
+    else:
+        for port in port_list:
+            test_situation(port)
+    f_out = open(f'summary_{ip}', 'w')
     for summary_line in output_summary:
         f_out.write(summary_line)
     f_out.close()
