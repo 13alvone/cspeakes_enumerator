@@ -48,4 +48,4 @@ This tool utilizes several tools, so please be sure that you have these tools in
 [+] snmpwalk
 [+] snmpcheck
 [+] onesixtyone
-[+] tndcmd10g
+[+] tndcmd10g``

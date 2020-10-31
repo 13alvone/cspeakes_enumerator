@@ -19,6 +19,8 @@ def parse_args():
     parser.add_argument('-rpc', '--rpc_port', help='Target RPC Port', default=111, type=int, required=False)
     parser.add_argument('-s', '--scan_type', help='Scan Speed: [`long` or `short`]', default='short', type=str,
                         required=False)
+    parser.add_argument('-wc', '--web_crawl', help='Depth used for generating cewl page loads', type=int,
+                        default=5, required=False)
     parser.add_argument('-c', '--command_timeout', help='Command Timeout [Default = 600 seconds]', default=111,
                         type=int, required=False)
     arguments = parser.parse_args()
@@ -30,9 +32,11 @@ wordlist_repo = '/root/HACK_TOOLS/cspeakes_wordlists'   # Change to proper direc
 suppression = ' >/dev/null 2>&1'  # suppression, change if needed
 suppression_list = ['masscan', 'dotdotpwn', ]
 disabled_cmd_list = ['dotdotpwn', ]
+port_list = []
 args = parse_args()
 command_timeout = args.command_timeout
 scan_type = args.scan_type
+web_crawl = args.web_crawl
 ip = args.ip
 nic = args.nic
 rpc_port = args.rpc_port
@@ -57,6 +61,7 @@ disable_list = [
 service_dict = {
     'initial': 'initial',
     'wordlist': 'wordlist',
+    'postALL': 'postALL',
     '21': 'ftp',
     '22': 'ssh',
     '25': 'smtp',
@@ -74,7 +79,7 @@ service_dict = {
 
 # COMMAND SETS =======================================================================
 def generate_command_dict():
-    global ip, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
+    global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_repo, nic
     command_sets_dict = {
         'initial': {
@@ -199,6 +204,14 @@ def generate_command_dict():
                 f'cewl -m 5 -v -d 6 -o {http_socket} >> custom_wordlist_{ip}': ['LONG', 'SHORT'],
             }
         },
+
+        'postALL': {
+            'tools': ['nmap', ],
+            'commands': {
+                f'nmap -nvv -Pn- -sSV -p {",".join(port_list)} --version-intensity 9 -A {ip} | tee '
+                f'intense_service_scan_{ip}': ['LONG', 'SHORT'],
+            }
+        },
     }
     return command_sets_dict
 
@@ -227,11 +240,12 @@ def print_elapsed_time():
 
 
 # HTTP(S) SOCKET EXTRACTOR & TESTER ==================================================
-def get_live_http_sockets(_ip, port_list):
+def get_live_http_sockets():
+    global ip, port_list
     live_http_socket_list = []
     for port in port_list:
-        _http_socket = f'http://{_ip}:{port}'
-        _https_socket = f'https://{_ip}:{port}'
+        _http_socket = f'http://{ip}:{port}'
+        _https_socket = f'https://{ip}:{port}'
         try:
             http_status = urllib.request.urlopen(_http_socket, timeout=10).getcode()
             msg = f'[i] Testing HTTP Socket: {_http_socket}\n\t*** Result: {http_status}\n'
@@ -285,10 +299,9 @@ def execute_os_command(_cmd):
 
 
 def get_live_ports():
-    global ip
+    global ip, port_list
     file_name = f'nmap_{ip}'
     file_in = open(file_name, 'r')
-    port_list = []
     for line in file_in:
         y = re.match('(\d+\/)s*(tcp|udp|sctp)', line)
         if y is not None:
@@ -350,9 +363,9 @@ def test_situation(port_str):
     return result
 
 
-def get_live_urls(port_list):
-    global output_summary, ip
-    url_list = get_live_http_sockets(ip, port_list)
+def get_live_urls():
+    global output_summary, ip, port_list
+    url_list = get_live_http_sockets()
     if len(url_list) != 0:
         msg = '||||||||||||||||||||||||||\n****HTTP Live Sockets:\n||||||||||||||||||||||||||\n'
         for url in url_list:
@@ -368,21 +381,21 @@ def get_live_urls(port_list):
 
 
 def generate_custom_wordlist():
-    global ip, http_port, http_socket
+    global ip, http_port, http_socket, web_crawl
     filename_list = []
     http_list = []
     final_wordlist = []
 
     for root, dirs, files in os.walk("."):
         for filename in files:
-            if re.match('dirb_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename) or re.match('gobuster_', filename):
+            if re.match(r'dirb_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename) or re.match('gobuster_', filename):
                 filename_list.append(filename)
 
     for filename in filename_list:
         f_open = open(filename, 'r')
         if 'dirb_' in filename:
             for line in f_open:
-                if re.match('^(http|https)://', line):
+                if re.match(r'^(http|https)://', line):
                     http_line_cleaned = line.split(' ')
                     for clean_http_line in http_line_cleaned:
                         if re.match('^(http|https)://', clean_http_line):
@@ -394,44 +407,57 @@ def generate_custom_wordlist():
                 http_list.append('http://' + str(ip) + '/' + str(line.split(' ')[0]))
                 http_list.append('https://' + str(ip) + '/' + str(line.split(' ')[0]))
             f_open.close()
-
-    for http_addr in http_list:
-        http_socket = http_addr
-        socket_updater(ip, http_port)
-        test_situation('wordlist')
+    if web_crawl <= len(http_list):
+        for http_addr in http_list:
+            http_socket = http_addr
+            socket_updater(ip, http_port)
+            test_situation('wordlist')
+    else:
+        counter = 0
+        while counter <= web_crawl:
+            for http_addr in http_list:
+                http_socket = http_addr
+                socket_updater(ip, http_port)
+                test_situation('wordlist')
+                counter += 1
+                if counter > web_crawl:
+                    break
 
     wordlist_location = ''
     for root, dirs, files in os.walk("."):
         for filename in files:
-            if re.match('custom_wordlist_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{3}', filename):
+            if re.match(r'custom_wordlist_\d{0,3}\.\d{0,3}\.\d{0,3}\.\d{0,3}', filename):
                 wordlist_location = filename
-                f_open = open(wordlist_location, 'r')
-                start_flag = 0
-                for line in f_open:
-                    if line == 'Words found\n' or line == 'Words found':
-                        start_flag = 1
-                    if start_flag == 1 and line != '\n' and line != '':
-                        _word = line.split(' ')[0]
-                        if _word not in final_wordlist:
-                            final_wordlist.append(_word)
-                    if start_flag == 1 and (line == '\n' or line == ''):
-                        start_flag = 0
-                f_open.close()
+                if wordlist_location != '':
+                    f_open = open(wordlist_location, 'r')
+                    start_flag = 0
+                    for line in f_open:
+                        if line == 'Words found\n' or line == 'Words found':
+                            start_flag = 1
+                        if start_flag == 1 and line != '\n' and line != '':
+                            _word = line.split(' ')[0]
+                            if _word not in final_wordlist:
+                                final_wordlist.append(_word)
+                        if start_flag == 1 and (line == '\n' or line == ''):
+                            start_flag = 0
+                    f_open.close()
 
-    f_open = open(wordlist_location, 'r+')
-    f_open.truncate(0)
-    for word in final_wordlist:
-        f_open.write(word)
-    f_open.close()
+    if wordlist_location != '':
+        f_open = open(wordlist_location, 'r+')
+        f_open.truncate(0)
+        for word in final_wordlist:
+            f_open.write(word)
+        f_open.close()
 
 
 def main():
-    global ip, output_summary, current_cmd_list
+    global ip, output_summary, current_cmd_list, port_list
     current_cmd_list = generate_command_dict()
     logger.warning(f'Started Script! Please Be Patient...\n[+] TARGET: {ip}\n')
     test_situation('initial')
-    port_list = get_live_ports()
-    url_list = get_live_urls(port_list)
+    get_live_ports()
+    test_situation('postALL')
+    url_list = get_live_urls()
     initial_result = False
     if len(url_list) != 0:
         for url in url_list:
