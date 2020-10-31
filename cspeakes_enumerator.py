@@ -332,7 +332,9 @@ def test_situation(port_str):
             tool_list = command_sets[situation]['tools']
             try:
                 cmd_dict = command_sets[situation]['commands']
-                msg = f'[{situation.upper()}] - Testing with command(s): {", ".join(tool_list)}\n'
+                tool_list_length = len(tool_list)
+                tools = ", ".join(tool_list) if tool_list_length > 1 else tools = tool_list[0]
+                msg = f'[{situation.upper()}] - Testing with command(s): {tools}\n'
                 output_summary.append(msg)
                 logger.warning(msg)
                 for cmd in cmd_dict:
