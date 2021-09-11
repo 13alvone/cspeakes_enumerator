@@ -65,6 +65,7 @@ service_dict = {
     '21': 'ftp',
     '22': 'ssh',
     '25': 'smtp',
+    '53': 'dns',
     '80': 'http',
     '110': 'pop',
     '111': 'rpc',
@@ -88,6 +89,16 @@ def generate_command_dict():
                 f'nmap -sC -sV -O -A {ip} >> nmap_{ip}': ['LONG', 'SHORT'],
                 f'nmap -p1-65535 {ip} >> nmap_{ip}': ['LONG', 'SHORT'],
                 f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -e {nic} -oL masscan_{ip}': ['LONG', 'SHORT'],
+            }
+        },
+        
+        'dns': {
+            'tools': ['dig', 'nmap', 'dnsrecon', ],
+            'commands': {
+                f'dig axfr {ip} > dns_summary_{ip}': ['LONG', 'SHORT'],
+                f'nmap -n --script "(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" {ip} >> dns_summary_{ip}',
+                f'dnsrecon -r {ip}/24 -n {ip} >> dns_summary_{ip}',
+                f'dnsrecon -d dns_summary_{ip}_2 -a -n {ip}',
             }
         },
 
