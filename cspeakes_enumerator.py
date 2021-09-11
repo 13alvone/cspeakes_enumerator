@@ -96,9 +96,10 @@ def generate_command_dict():
             'tools': ['dig', 'nmap', 'dnsrecon', ],
             'commands': {
                 f'dig axfr {ip} > dns_summary_{ip}': ['LONG', 'SHORT'],
-                f'nmap -n --script "(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" {ip} >> dns_summary_{ip}',
-                f'dnsrecon -r {ip}/24 -n {ip} >> dns_summary_{ip}',
-                f'dnsrecon -d dns_summary_{ip}_2 -a -n {ip}',
+                f'nmap -n --script "(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" '
+                f'{ip} >> dns_summary_{ip}': ['LONG', 'SHORT'],
+                f'dnsrecon -r {ip}/24 -n {ip} >> dns_summary_{ip}': ['LONG', 'SHORT'],
+                f'dnsrecon -d dns_summary_{ip}_2 -a -n {ip}': ['LONG', 'SHORT'],
             }
         },
 
