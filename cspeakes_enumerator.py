@@ -94,7 +94,7 @@ def generate_command_dict():
         'ftp': {
             'tools': ['nmap', 'nmap_nse_scripts', ],
             'commands': {
-                'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,'
+                f'nmap --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,'
                 f'ftp-vuln-cve2010-4221,tftp-enum -p 21 {ip} >> ftp_{ip}': ['LONG', 'SHORT'],
             }
         },
