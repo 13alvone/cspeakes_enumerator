@@ -27,7 +27,7 @@ def parse_args():
     parser.add_argument('-dns', '--dns_port', help='Target SSH Port', default=53, type=int, required=False)
     parser.add_argument('-pop', '--pop_port', help='Target POP Port', default=110, type=int, required=False)
     parser.add_argument('-smb', '--smb_port', help='Target SMB Port', default=139, type=int, required=False)
-    parser.add_argument('-smb', '--snmp_port', help='Target SNMP Port', default=161, type=int, required=False)
+    parser.add_argument('-snmp', '--snmp_port', help='Target SNMP Port', default=161, type=int, required=False)
     parser.add_argument('-http', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
     parser.add_argument('-https', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
     arguments = parser.parse_args()
