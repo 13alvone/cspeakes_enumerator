@@ -14,8 +14,6 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--ip', help='Target IP Address', default='BLANK', type=str, required=True)
     parser.add_argument('-n', '--nic', help='Target HTTP Port', default='eth1', type=str, required=False)
-    parser.add_argument('-hp', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
-    parser.add_argument('-hps', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
     parser.add_argument('-rpc', '--rpc_port', help='Target RPC Port', default=111, type=int, required=False)
     parser.add_argument('-s', '--scan_type', help='Scan Speed: [`long` or `short`]', default='short', type=str,
                         required=False)
@@ -23,6 +21,15 @@ def parse_args():
                         default=5, required=False)
     parser.add_argument('-c', '--command_timeout', help='Command Timeout [Default = 600 seconds]', default=111,
                         type=int, required=False)
+    parser.add_argument('-ftp', '--ftp_port', help='Target FTP Port', default=21, type=int, required=False)
+    parser.add_argument('-ssh', '--ssh_port', help='Target SSH Port', default=22, type=int, required=False)
+    parser.add_argument('-smtp', '--smtp_port', help='Target SMTP Port', default=25, type=int, required=False)
+    parser.add_argument('-dns', '--dns_port', help='Target SSH Port', default=53, type=int, required=False)
+    parser.add_argument('-pop', '--pop_port', help='Target POP Port', default=110, type=int, required=False)
+    parser.add_argument('-smb', '--smb_port', help='Target SMB Port', default=139, type=int, required=False)
+    parser.add_argument('-smb', '--snmp_port', help='Target SNMP Port', default=161, type=int, required=False)
+    parser.add_argument('-http', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
+    parser.add_argument('-https', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
     arguments = parser.parse_args()
     return arguments
 
@@ -42,6 +49,13 @@ nic = args.nic
 rpc_port = args.rpc_port
 http_port = args.http_port
 https_port = args.https_port
+ftp_port = args.ftp_port
+ssh_port = args.ssh_port
+smtp_port = args.smtp_port
+dns_port = args.dns_port
+pop_port = args.pop_port
+smb_port = args.smb_port
+snmp_port = args.snmp_port
 http_socket = f'http://{ip}:{http_port}'
 http_filename = http_socket.replace('http://', '').replace('//', '').replace('/', '-')
 https_socket = f'https://{ip}:{https_port}'
@@ -52,26 +66,22 @@ logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 current_cmd_list = {}
 output_summary = []
-disable_list = [
-    'http_dirb_long',
-    'https_dirb_long',
-]
 
 # SERVICE / PORT DEFINITIONS =========================================================
 service_dict = {
     'initial': 'initial',
     'wordlist': 'wordlist',
     'postALL': 'postALL',
-    '21': 'ftp',
-    '22': 'ssh',
-    '25': 'smtp',
-    '53': 'dns',
-    '80': 'http',
-    '110': 'pop',
-    '111': 'rpc',
-    '139': 'smb',
-    '161': 'snmp',
-    '443': 'https',
+    f'{ftp_port}': 'ftp',
+    f'{ssh_port}': 'ssh',
+    f'{smtp_port}': 'smtp',
+    f'{dns_port}': 'dns',
+    f'{http_port}': 'http',
+    f'{pop_port}': 'pop',
+    f'{rpc_port}': 'rpc',
+    f'{smb_port}': 'smb',
+    f'{snmp_port}': 'snmp',
+    f'{https_port}': 'https',
     '445': 'smb',
     '1521': 'oracle',
     '3306': 'mysql',
@@ -325,7 +335,7 @@ def get_live_ports():
             except Exception as e:
                 logger.warning(e)
                 continue
-    msg = '||||||||||||||||||||||||||\n****Open Ports Detected:\n||||||||||||||||||||||||||\n'
+    msg = '||||||||||||||||||||||||||\nOpen Ports Detected:\n||||||||||||||||||||||||||\n'
     for port in port_list:
         msg += f'{port}\n'
     msg = msg + '\n'
@@ -355,9 +365,10 @@ def test_situation(port_str):
                 for cmd in cmd_dict:
                     if scan_type.upper() in cmd_dict[cmd]:
                         try:
-                            execute_os_command(cmd)
                             result = True
+                            execute_os_command(cmd)
                         except Exception as e:
+                            result = False
                             msg = f'[-] - Execution of the [{situation.upper()}] command set failed.\n'
                             output_summary.append(msg)
                             logger.warning(msg)
@@ -384,7 +395,7 @@ def get_live_urls():
     global output_summary, ip, port_list
     url_list = get_live_http_sockets()
     if len(url_list) != 0:
-        msg = '||||||||||||||||||||||||||\n****HTTP Live Sockets:\n||||||||||||||||||||||||||\n'
+        msg = '||||||||||||||||||||||||||\nHTTP Live Sockets:\n||||||||||||||||||||||||||\n'
         for url in url_list:
             msg += f'[+] {url}\n'
         msg = msg + '\n'
