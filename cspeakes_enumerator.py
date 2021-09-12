@@ -126,7 +126,7 @@ def generate_command_dict():
                 f'-r -l -S -i -f -o dirb_{http_filename}': ['LONG', 'SHORT'],
                 f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q -r dotdotpwn_{http_filename}': ['LONG', 'SHORT'],
                 f'nikto -h {http_socket} -output nikto_{http_filename}.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {http_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                f'gobuster dir -u {http_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-big.txt '
                 f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o '
                 f'gobuster_2nd_run_{http_filename}': ['LONG', 'SHORT'],
                 f'dirb {http_socket} /usr/share/wordlists/dirb/common.txt -x {wordlist_repo}/extensions.txt '
@@ -142,7 +142,7 @@ def generate_command_dict():
                 f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q -r '
                 f'dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
                 f'nikto -h {https_socket.split(":")[0]} -output nikto_{https_filename}.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {https_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt '
+                f'gobuster dir -u {https_socket} -w /usr/share/wordlists/dirbuster/directory-list-2.3-big.txt '
                 f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o '
                 f'gobuster_2nd_run_{https_filename}': ['LONG', 'SHORT'],
                 f'dirb {https_socket} /usr/share/wordlists/dirb/common.txt -x {wordlist_repo}/extensions.txt '
