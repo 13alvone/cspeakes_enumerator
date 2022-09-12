@@ -3,8 +3,6 @@
 
 Emulator is a tool for doing some very basic but robust general enumeration commands I use for initial discovery. Usage is simple as you need only supply the target IP address:
 
-> ~# python3 enumerator.py -i <target_ip>```
-
 [?] `~# python3 enumerator.py`
 
 ```shell
@@ -78,4 +76,4 @@ This tool utilizes several tools, so please be sure that you have these tools in
 [+] snmpwalk
 [+] snmpcheck
 [+] onesixtyone
-[+] tndcmd10g``
+[+] tndcmd10g
