@@ -3,19 +3,49 @@
 
 Cspeakes_emulator is a tool for doing some very basic but robust general enumeration commands I use for initial discovery. Usage is simple as you need only supply the target IP address:
 
-[+] ```~# python3 cspeakes_enumerator.py -i <target_ip> -n <eth0> -s short -c 600```
+> ~# python3 cspeakes_enumerator.py -i <target_ip>```
 
 [?] `~# python3 cspeakes_enumerator.py`
 
-`usage: cspeakes_enumerator.py [-h] -i IP [-n NIC] [-hp HTTP_PORT] [-hps HTTPS_PORT] [-rpc RPC_PORT]
-                              [-s SCAN_TYPE] [-c COMMAND_TIMEOUT]
-`
+```shell
+usage: cspeakes_enumerator.py [-h] -i IP [-rpc RPC_PORT] [-s SCAN_TYPE] [-c COMMAND_TIMEOUT] [-ftp FTP_PORT] [-ssh SSH_PORT] [-smtp SMTP_PORT] [-dns DNS_PORT] [-pop POP_PORT]
+                              [-smb SMB_PORT] [-snmp SNMP_PORT] [-http HTTP_PORT] [-https HTTPS_PORT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i IP, --ip IP        Target IP Address
+  -rpc RPC_PORT, --rpc_port RPC_PORT
+                        Target RPC Port
+  -s SCAN_TYPE, --scan_type SCAN_TYPE
+                        Scan Speed: [`long` or `short`]
+  -c COMMAND_TIMEOUT, --command_timeout COMMAND_TIMEOUT
+                        Command Timeout [Default = 600 seconds]
+  -ftp FTP_PORT, --ftp_port FTP_PORT
+                        Target FTP Port
+  -ssh SSH_PORT, --ssh_port SSH_PORT
+                        Target SSH Port
+  -smtp SMTP_PORT, --smtp_port SMTP_PORT
+                        Target SMTP Port
+  -dns DNS_PORT, --dns_port DNS_PORT
+                        Target SSH Port
+  -pop POP_PORT, --pop_port POP_PORT
+                        Target POP Port
+  -smb SMB_PORT, --smb_port SMB_PORT
+                        Target SMB Port
+  -snmp SNMP_PORT, --snmp_port SNMP_PORT
+                        Target SNMP Port
+  -http HTTP_PORT, --http_port HTTP_PORT
+                        Target HTTP Port
+  -https HTTPS_PORT, --https_port HTTPS_PORT
+                        Target HTTPs Port
+
+```
+
 ##### Please Note:
 
 
 * There are notes in the code as well, to help with further customization.
-* There are currently no options, simply supply the script with a target ip.
- ... & Please Be Patient... It takes a bit to run all the tests (~20ish min).
+ ... & Please Be Patient... It takes a bit to run all the tests (~15ish min).
  ... & Don't Worry.. It outputs to screen and to text files for later review.
 
 

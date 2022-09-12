@@ -1,0 +1,477 @@
+# Author: Chris Speakes
+# Email: 13alvone@gmail.com
+import re
+import os
+import time
+import math
+import requests
+import argparse
+import subprocess
+from pathlib import Path
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--ip', help='Target IP Address', default='BLANK', type=str, required=True)
+    parser.add_argument('-rpc', '--rpc_port', help='Target RPC Port', default=111, type=int, required=False)
+    parser.add_argument('-s', '--scan_type', help='Scan Speed: [`long` or `short`]', default='short', type=str,
+                        required=False)
+    parser.add_argument('-c', '--command_timeout', help='Command Timeout [Default = 30 Minutes]', default=3000,
+                        type=int, required=False)
+    parser.add_argument('-ftp', '--ftp_port', help='Target FTP Port', default=21, type=int, required=False)
+    parser.add_argument('-ssh', '--ssh_port', help='Target SSH Port', default=22, type=int, required=False)
+    parser.add_argument('-smtp', '--smtp_port', help='Target SMTP Port', default=25, type=int, required=False)
+    parser.add_argument('-dns', '--dns_port', help='Target SSH Port', default=53, type=int, required=False)
+    parser.add_argument('-pop', '--pop_port', help='Target POP Port', default=110, type=int, required=False)
+    parser.add_argument('-smb', '--smb_port', help='Target SMB Port', default=139, type=int, required=False)
+    parser.add_argument('-snmp', '--snmp_port', help='Target SNMP Port', default=161, type=int, required=False)
+    parser.add_argument('-http', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
+    parser.add_argument('-https', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
+    return parser.parse_args()
+
+
+# Visual Indicators
+class Bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
+# Global Variables
+wordlist_root = 'wordlists'
+suppression = ' >/dev/null 2>&1'  # suppression, change if needed
+suppression_list = ['masscan', 'dotdotpwn', ]
+disabled_cmd_list = ['dotdotpwn', 'nikto', 'masscan', ]
+port_list = []
+args = get_args()
+command_timeout = args.command_timeout
+scan_type = args.scan_type
+ip = args.ip
+rpc_port = args.rpc_port
+http_port = args.http_port
+https_port = args.https_port
+ftp_port = args.ftp_port
+ssh_port = args.ssh_port
+smtp_port = args.smtp_port
+dns_port = args.dns_port
+pop_port = args.pop_port
+smb_port = args.smb_port
+snmp_port = args.snmp_port
+socket_dict = {}
+output_root_dir = f"{'/'.join(os.getcwd().split('/')[:-1])}/{ip}_results"
+http_socket = f'http://{ip}:{http_port}'
+http_filename = http_socket.replace('http://', '').replace('//', '').replace('/', '-')
+https_socket = f'https://{ip}:{https_port}'
+https_filename = https_socket.replace('https://', '').replace('//', '').replace('/', '-')
+original_start_time = time.time()
+current_process_time = time.time()
+output_summary = []
+mood = {
+        'start': f'{Bcolors.OKBLUE}{Bcolors.BOLD}{Bcolors.UNDERLINE}',
+        'header': f'{Bcolors.OKGREEN}{Bcolors.BOLD}{Bcolors.UNDERLINE}',
+        'good': f'{Bcolors.OKGREEN}{Bcolors.BOLD}',
+        'bad': f'{Bcolors.FAIL}{Bcolors.BOLD}',
+        'warning': f'{Bcolors.OKCYAN}{Bcolors.BOLD}',
+        'info': f'{Bcolors.OKBLUE}{Bcolors.BOLD}',
+        'end': f'{Bcolors.ENDC}'
+    }
+
+# Service / Port Definitions
+service_dict = {
+    'initial': 'initial',
+    'wordlist': 'wordlist',
+    'all': 'all',
+    f'{ftp_port}': 'ftp',
+    f'{ssh_port}': 'ssh',
+    f'{smtp_port}': 'smtp',
+    f'{dns_port}': 'dns',
+    f'{http_port}': 'http',
+    f'{pop_port}': 'pop',
+    f'{rpc_port}': 'rpc',
+    f'{smb_port}': 'smb',
+    f'{snmp_port}': 'snmp',
+    f'{https_port}': 'https',
+    '445': 'smb',
+    '1521': 'oracle',
+    '3306': 'mysql',
+}
+
+
+# Command Sets
+def generate_command_dict():
+    global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
+    global wordlist_root, output_root_dir, args
+    command_sets_dict = {
+        'initial': {
+            'commands': {
+                f'nmap -p1-65535 -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG'],
+                f'nmap -Pn -p1-65535 {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
+                f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG'],
+            }
+        },
+        
+        'dns': {
+            'commands': {
+                f'dig axfr {ip} > {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'nmap -n --script '
+                f'"(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" '
+                f'{ip} >> {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'dnsrecon -r {ip}/24 -n {ip} >> {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'dnsrecon -d {output_root_dir}/dns_summary_2 -a -n {ip}': ['LONG', 'SHORT'],
+            }
+        },
+
+        'ftp': {
+            'commands': {
+                f'nmap --script ftp-* -p {args.ftp_port} {ip}':['LONG', 'SHORT'],
+            }
+        },
+
+        'smtp': {
+            'commands': {
+                f'nmap –script smtp-commands,smtp-enum-users -p 25 {ip} '
+                f'>> {output_root_dir}/smtp_summary': ['LONG', 'SHORT'],
+            }
+        },
+
+        'http': {
+            'commands': {
+                f'dirb {http_socket} {wordlist_root}/small.txt -x extensions.txt '
+                f'-r -l -S -i -f -o {output_root_dir}/dirb_summary': ['LONG', 'SHORT'],
+                f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q '
+                f'-r {output_root_dir}/dotdotpwn_summary': ['LONG', 'SHORT'],
+                f'nikto -h {http_socket} -output {output_root_dir}/nikto_summary.txt': ['LONG', 'SHORT'],
+                f'gobuster dir -u {http_socket} -w {wordlist_root}/small.txt '
+                f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'{output_root_dir}/gobuster_summary': ['LONG', 'SHORT'],
+                f'dirb {http_socket} {wordlist_root}/common.txt -x extensions.txt '
+                f'-r -l -S -i -f -o {output_root_dir}/dirb_summary': ['LONG'],
+            }
+        },
+
+        'https': {
+            'commands': {
+                f'dirb {https_socket} {wordlist_root}/small.txt -x extensions.txt '
+                f'-r -l -S -i -f -o {output_root_dir}/dirb_{https_filename}': ['LONG'],
+                f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q -r '
+                f'{output_root_dir}/dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
+                f'nikto -h {https_socket.split(":")[0]} -output '
+                f'{output_root_dir}/nikto_{https_filename}.txt': ['LONG', 'SHORT'],
+                f'gobuster dir -u {https_socket} -w {wordlist_root}/small.txt '
+                f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'{output_root_dir}/gobuster_{https_filename}': ['LONG', 'SHORT'],
+                f'dirb {https_socket} {wordlist_root}/common.txt -x extensions.txt '
+                f'-r -l -S -i -f -o {output_root_dir}/dirb_{https_filename}': ['LONG'],
+                f'sslyze --regular {https_socket.replace("https://", "")} >> '
+                f'{output_root_dir}/sslyze_{https_filename}': ['LONG', 'SHORT'],
+                f'tlssled {ip} {https_port} >> {output_root_dir}/tlssled_{https_filename}': ['LONG', 'SHORT'],
+            }
+        },
+
+        'cgi_bin': {
+            'commands': {
+                f'gobuster dir -u {http_socket}/cgi-bin/ -w {wordlist_root}/small.txt '
+                f'-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 '
+                f'-o {output_root_dir}/cgi-bin_summary': ['LONG', 'SHORT']
+            }
+        },
+
+        'rpc': {
+            'commands': {
+                f'rpcinfo -p {ip} >> {output_root_dir}/rpc_summary': ['LONG', 'SHORT'],
+            }
+        },
+
+        'smb': {
+            'commands': {
+                f'nbtscan -r {ip} >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'enum4linux -a {ip} >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} >> '
+                f'{output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'nmap {ip} --script smb-enum-domains.nse,smb-enum-groups.nse,'
+                f'smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,'
+                f'smb-mbenum.nse,smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,'
+                f'smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,'
+                f'smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,'
+                f'smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+            }
+        },
+
+        'snmp': {
+            'commands': {
+                f'snmpwalk -c public -v1 {ip} >> {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+                f'snmpcheck -t {ip} -c public >> -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+                f'onesixtyone {ip} public >> -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+            }
+        },
+
+        'oracle': {
+            'commands': {
+                f'tnscmd10g version -h {ip} >> {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
+                f'tmscmd10g status -h {ip} >> {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
+            },
+        },
+
+        'mysql': {
+            'commands': {
+                f'nmap -sV -Pn -vv {ip} -p 3306 --script mysql-audit,mysql-databases,'
+                f'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,'
+                f'mysql-variables,mysql-vuln-cve2012-2122 >> {output_root_dir}/mysql_summary': ['LONG', 'SHORT'],
+            }
+        },
+
+        'all': {
+            'commands': {
+                f'nmap -nvv -Pn- -sSV -p {",".join(port_list)} --version-intensity 9 -A {ip} | tee '
+                f'{output_root_dir}/intense_service_scan_summary': ['LONG', 'SHORT'],
+            }
+        },
+    }
+    return command_sets_dict
+
+
+def chmod(_path):
+    try:
+        os.chmod(_path, 0o0777)
+    except Exception as e:
+        print(e)
+
+
+def build_dir_tree(_path):
+    if os.path.exists(_path):
+        intention_print(f'[i] Results Path Already Exists: `{_path}`', 'info')
+        return _path
+    try:
+        if _path[-1] == "/":
+            Path(_path[:-1]).mkdir(parents=True)
+        else:
+            Path(_path).mkdir(parents=True)
+        intention_print(f'[+] Results Path Created: `{_path}`', 'good')
+        chmod(_path)
+
+    except Exception as e:
+        intention_print(f'[-] Path Creation Error Details: `{e}`', 'bad')
+        return _path
+    return _path
+
+
+def socket_updater(new_ip, new_port):
+    global ip, http_port, https_port
+    ip = new_ip
+    http_port = new_port
+    https_port = new_port
+
+
+def print_elapsed_time():
+    global original_start_time, output_summary
+    seconds = round(int(time.time() - original_start_time), 2)
+    minutes = math.trunc(seconds / 60)
+    remaining_seconds = math.trunc(seconds - (minutes * 60))
+    if len(str(remaining_seconds)) != 2:
+        remaining_seconds = f'0{remaining_seconds}'
+    elapsed_time = f'{minutes}:{remaining_seconds}'
+    msg = f'\t\t[*] Total_Time Elapsed: `{elapsed_time}`'
+    output_summary.append(msg)
+    intention_print(msg, 'info')
+    return time.time()
+
+
+def http_response(_url):
+    r = requests.head(_url, verify=False, timeout=5)
+    content_type = f"{r.headers['content-type']}"
+    return f"{r.status_code}", f"{content_type}"
+
+
+def get_live_ports():
+    global ip, port_list, output_root_dir, mood
+    if not os.path.exists(f"{output_root_dir}/nmap_summary"):
+        return port_list
+    file_in = open(f"{output_root_dir}/nmap_summary", 'r')
+    for line in file_in:
+        y = re.match(r'(^\d+)/tcp|udp|sctp', line)
+        if y:
+            try:
+                result_tuple = y.groups()
+                port = result_tuple[0]
+                if port not in port_list:
+                    port_list.append(port)
+            except Exception as e:
+                print(e)
+                continue
+    msg = '[i] Open Ports Detected:`\n'
+    for port in port_list:
+        msg += f'{port}\n'
+    output_summary.append(msg)
+    print(f'{mood["good"]}{msg}{mood["end"]}\n')
+
+
+def get_live_sockets():
+    global ip, port_list, socket_dict
+    get_live_ports()
+    
+    for port in port_list:
+        potential_sockets = [f'http://{ip}:{port}', 
+                f'https://{ip}:{port}']
+        for potential_socket in potential_sockets:
+            try:
+                socket_response = http_response(potential_socket)
+                if int(socket_response[0]) < 400:
+                    socket_dict[potential_socket] = socket_response[0]
+            except:
+                continue
+
+
+def execute_os_command(_cmd):
+    global suppression, suppression_list, output_summary, disabled_cmd_list, command_timeout
+    output, error = None, None
+    for disabled_cmd in disabled_cmd_list:
+        if disabled_cmd in _cmd:
+            msg = f'\t[i] `{_cmd}`'
+            intention_print(msg, 'info')
+            output_summary.append(msg)
+            return msg, error
+    for flagged_cmd in suppression_list:
+        if flagged_cmd in _cmd:
+            _cmd = _cmd + suppression
+    intention_print(f'\t[i] Attempting: `{_cmd}`', 'info')
+    try:
+        results = subprocess.run(_cmd, shell=True, timeout=command_timeout)
+        if results.returncode == 0:
+            exec_msg = f'\t\t[+] Execution: `Completed Successfully!`'
+            intention = 'good'
+        else:
+            exec_msg = f'\t\t[-] Process Failure: `STDOUT: {results.stdout} --> STDERR: {results.stderr}`'
+            intention = 'bad'
+        intention_print(exec_msg, intention)
+    except Exception as e:
+        exec_msg = f'\t\t[-] General Failure - Details: `{e}`'
+        intention_print(exec_msg, 'bad')
+    output_summary.append(exec_msg)
+    print_elapsed_time()
+    return output, error
+
+
+def intention_print(_msg, _intention):
+    global mood
+    end = mood['end']
+    prefix = _msg.split('[', 1)[0]
+    postfix = _msg.split('`')[-1]
+
+    tag, instruction, payload = None, None, None
+    if match := re.search(r'(\[.*?])(.*?)`(.*?)`', _msg, re.IGNORECASE):
+        try:
+            tag = match.group(1)
+            instruction = match.group(2)
+            payload = match.group(3)
+        except:
+            print(f"[i] Unformulated Print -->\n{_msg}")
+            return _msg
+
+    if not tag or not instruction or not payload:
+        return _msg
+
+    print(f"{prefix}"
+          f"{mood[_intention]}{tag}{end}"
+          f"{instruction}`"
+          f"{mood['warning']}{payload}{end}`"
+          f"{postfix}")
+    return _msg
+
+
+def test_situation(port_str):
+    global service_dict, output_summary, suppression_list, scan_type
+    result = False
+    command_sets = generate_command_dict()
+    try:
+        situation = f'{service_dict[port_str]}'
+        try:
+            tool_set = set(tool.split(" ")[0] for tool in command_sets[situation]['commands'])
+            try:
+                cmd_dict = command_sets[situation]['commands']
+                tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
+                msg = f'\n[{situation.upper()}] - Testing with tool set: `{tools}`'
+                output_summary.append(msg)
+                intention_print(msg, 'header')
+                for cmd in cmd_dict:
+                    if scan_type.upper() in cmd_dict[cmd]:
+                        try:
+                            result = True
+                            execute_os_command(cmd)
+                        except Exception as e:
+                            result = False
+                            msg = f'\n\t[-] - Command set failure: {situation.upper()} Error: `{e}`\n'
+                            output_summary.append(msg)
+                            intention_print(msg, 'bad')
+                    else:
+                        msg = f'\n\t[i] Disabled CMD: `{cmd}`'
+                        output_summary.append(msg)
+                        intention_print(msg, 'info')
+            except Exception as e:
+                msg = f'\n\t[-] No module defined for {situation.upper()}, Error: `{e}`'
+                output_summary.append(msg)
+                intention_print(msg, 'bad')
+        except Exception as e:
+            msg = f'\n\t[-] No module defined for {port_str}, Error: `{e}`'
+            output_summary.append(msg)
+            intention_print(msg, 'bad')
+    except Exception as e:
+        msg = f'\n\t[-] No port service defined in service_dict for : {port_str}, Error: `{e}`'
+        output_summary.append(msg)
+        intention_print(msg, 'bad')
+    return result
+
+
+def build_output_structure():
+    global output_root_dir
+    _dirs = [output_root_dir,
+             f"{'/'.join(output_root_dir.split('/')[:-1])}/artifacts",
+             f"{'/'.join(output_root_dir.split('/')[:-1])}/exploits"]
+    for _dir in _dirs:
+        if not os.path.exists(_dir):
+            try:
+                build_dir_tree(_dir)
+            except:
+                pass
+
+
+def main():
+    global ip, output_summary, port_list, output_root_dir, socket_dict
+    generate_command_dict()
+    build_output_structure()
+
+    # Begin testing on all components.
+    intention_print(f'[+] TARGET: `{ip}`', 'start')
+    test_situation('initial')
+    get_live_sockets()
+    test_situation('all')
+
+    # Test each identified socket.
+    initial_result = False
+    if len(socket_dict) != 0:
+        for _socket in socket_dict.keys():
+            socket_updater(ip, _socket.split(':')[1])
+            if test_situation('80'):    # Test each socket for HTTP
+                initial_result = True
+    if initial_result:
+        for port in port_list:
+            if port != '80':
+                test_situation(port)
+    else:
+        for port in port_list:
+            test_situation(port)
+
+    # Write the output to the summary file for this run.
+    f_out = open(f'{output_root_dir}/summary_{ip}', 'w')
+    for summary_line in output_summary:
+        f_out.write(summary_line)
+    f_out.close()
+
+
+if __name__ == '__main__':
+    main()
