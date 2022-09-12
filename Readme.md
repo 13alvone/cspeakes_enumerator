@@ -1,14 +1,14 @@
-# cspeakes_enumerator.py
+# enumerator.py
 -----------------------
 
-Cspeakes_emulator is a tool for doing some very basic but robust general enumeration commands I use for initial discovery. Usage is simple as you need only supply the target IP address:
+Emulator is a tool for doing some very basic but robust general enumeration commands I use for initial discovery. Usage is simple as you need only supply the target IP address:
 
-> ~# python3 cspeakes_enumerator.py -i <target_ip>```
+> ~# python3 enumerator.py -i <target_ip>```
 
-[?] `~# python3 cspeakes_enumerator.py`
+[?] `~# python3 enumerator.py`
 
 ```shell
-usage: cspeakes_enumerator.py [-h] -i IP [-rpc RPC_PORT] [-s SCAN_TYPE] [-c COMMAND_TIMEOUT] [-ftp FTP_PORT] [-ssh SSH_PORT] [-smtp SMTP_PORT] [-dns DNS_PORT] [-pop POP_PORT]
+usage: enumerator.py [-h] -i IP [-rpc RPC_PORT] [-s SCAN_TYPE] [-c COMMAND_TIMEOUT] [-ftp FTP_PORT] [-ssh SSH_PORT] [-smtp SMTP_PORT] [-dns DNS_PORT] [-pop POP_PORT]
                               [-smb SMB_PORT] [-snmp SNMP_PORT] [-http HTTP_PORT] [-https HTTPS_PORT]
 
 optional arguments:
