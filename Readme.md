@@ -1,7 +1,7 @@
 # enumerator.py
 -----------------------
 
-Emulator is a tool for doing some very basic but robust general enumeration commands I use for initial discovery. Usage is simple as you need only supply the target IP address:
+Enumerator.py is a tool that completes some basic enumeration commands useful during initial discovery.
 
 [?] `~# python3 enumerator.py`
 
@@ -53,15 +53,11 @@ inherently insecure and can be dangerous to your system should you or someone el
 so, please use this script carefully. Furthermore, this script MUST be run as root to get access to sockets so again,
 BE CAREFUL AND ONLY USE THIS SCRIPT IF YOU UNDERSTAND WHAT IT IS DOING.  
 
-Gotta be that guy real quick....
- 
- This is a script that performs passive AND active information gathering tasks. DO NOT use this script to target any ip's, businesses, or organizations that you do not have explicit permission to target! IT IS ILLEGAL!
+This is a script that performs passive AND active information gathering tasks. DO NOT use this script to target any ip's, businesses, or organizations that you do not have explicit permission to target! IT IS ILLEGAL!
   ##### I take NO responsibility for the use of this script as it was created for cyber security research/testing and educational uses only.
-  
-There. Done being that guy.
 
 
-##### Prerequisites:
+##### Prerequisites (Typically pre-installed on KALI Linux):
 This tool utilizes several tools, so please be sure that you have these tools installed and in $PATH before you attempt to operate.
 [+] nmap
 [+] massscan
