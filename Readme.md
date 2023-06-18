@@ -7,6 +7,8 @@
 
 ```                   
 
+Kali Linux Aggregated Enumerator
+
 `cspeakes_enum` is a tool built to run on Kali Linux that completes some basic enumeration commands potentially useful during initial discovery. This is a very loud script that is typically used in CTF challenges such as those available on vulnhub.com and hackthebox.eu.
 
 ***Please Note:
@@ -16,8 +18,17 @@
 > Don't Worry.. It outputs to screen and to text files for later review.
 > This script is very LOUD, in that it will trigger a lot of alarms on a target system, assuming that target system is being properly monitored. For those obvious reasons, this should ONLY be used against systems you have permission to, such as those designed specifically for CTF challenges. For those who like to learn by doing, consider setting up a free Splunk instance, use the Splunk UF to forward local logs on a target machine in your LAN set up for this test, and then run this script from an attacker machine against the monitored machine. This will allow you to review what such activity looks like first hand, directly from Splunk SPL. BUT, this is not required at all.
 
-## Installation:
-This script can be used by utilizing the following commands which put everything in place. 
+## Installation (Easy Way):
+```shell
+git clone <this_git_repo_url>
+cd cspeakes_enumerator
+chmod +x install.sh
+./install.sh
+```
+
+## Installation (Hard Way):
+
+For those who would rather do it line by line themselves, the following commands put everything in place on Kali: 
 
 ```shell
 git clone <this_git_repo_url>
