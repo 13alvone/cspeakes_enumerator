@@ -1,4 +1,9 @@
-# Cspeakes Enum
+   ______                      __                ______                                      __            
+  / ____/________  ___  ____ _/ /_____  _____   / ____/___  __  ______ ___  ___  _________ _/ /_____  _____
+ / /   / ___/ __ \/ _ \/ __ `/ //_/ _ \/ ___/  / __/ / __ \/ / / / __ `__ \/ _ \/ ___/ __ `/ __/ __ \/ ___/
+/ /___(__  ) /_/ /  __/ /_/ / ,< /  __(__  )  / /___/ / / / /_/ / / / / / /  __/ /  / /_/ / /_/ /_/ / /    
+\____/____/ .___/\___/\__,_/_/|_|\___/____/  /_____/_/ /_/\__,_/_/ /_/ /_/\___/_/   \__,_/\__/\____/_/     
+         /_/                                                                                               
 -----------------------
 
 `cspeakes_enum` is a tool built to run on Kali Linux that completes some basic enumeration commands potentially useful during initial discovery. This is a very loud script that is typically used in CTF challenges such as those available on vulnhub.com and hackthebox.eu.
