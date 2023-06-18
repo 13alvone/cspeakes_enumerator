@@ -50,7 +50,7 @@ If you find some further configurations such as different ports or options after
 ```shell
 sudo <target_ip>/cspeakes_enumerator/cspeakes_enum <see_extended_usage>
 ```
-***Please be sure to execute with `sudo` as some of the subcommands require NIC access permissions to run as expected. 
+***Please be sure to execute with `sudo` as some of the subcommands require NIC access permissions to run as expected.***
 
 ## Extended Usage:
 ```shell
