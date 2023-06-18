@@ -12,7 +12,7 @@
 `cspeakes_enum` is a tool built to run on Kali Linux that completes some basic enumeration commands potentially useful during initial discovery. This is a very loud script that is typically used in CTF challenges such as those available on vulnhub.com and hackthebox.eu.
 
 ***Please Note:
-
+ 
 > There are further notes throughout the code as well, to help with further customization.
 > Please Be Patient... It takes a bit to run all the tests (~15ish min).
 > Don't Worry.. It outputs to screen and to text files for later review.
@@ -48,8 +48,9 @@ target <target_ip>
 
 If you find some further configurations such as different ports or options after the first scan's results are returned, you can rerun the enumerator alone without (see Full Usage below for all options):
 ```shell
-<target_ip>/cspeakes_enumerator/cspeakes_enum <see_extended_usage>
+sudo <target_ip>/cspeakes_enumerator/cspeakes_enum <see_extended_usage>
 ```
+***Please be sure to execute with `sudo` as some of the subcommands require NIC access permissions to run as expected. 
 
 ## Extended Usage:
 ```shell
