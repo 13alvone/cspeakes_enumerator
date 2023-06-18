@@ -1,5 +1,4 @@
-# Author: Chris Speakes
-# Email: 13alvone@gmail.com
+#!/usr/bin/env python3
 import re
 import os
 import time
@@ -8,9 +7,22 @@ import requests
 import argparse
 import subprocess
 from pathlib import Path
+from colorama import Fore, Back, Style
 
+
+# Ridiculous, Obligatory Title
+silly_title = '''
+   ______                      __                ______                                      __            
+  / ____/________  ___  ____ _/ /_____  _____   / ____/___  __  ______ ___  ___  _________ _/ /_____  _____
+ / /   / ___/ __ \/ _ \/ __ `/ //_/ _ \/ ___/  / __/ / __ \/ / / / __ `__ \/ _ \/ ___/ __ `/ __/ __ \/ ___/
+/ /___(__  ) /_/ /  __/ /_/ / ,< /  __(__  )  / /___/ / / / /_/ / / / / / /  __/ /  / /_/ / /_/ /_/ / /    
+\____/____/ .___/\___/\__,_/_/|_|\___/____/  /_____/_/ /_/\__,_/_/ /_/ /_/\___/_/   \__,_/\__/\____/_/     
+         /_/                                                                                               
+'''
 
 def get_args():
+    global silly_title
+    print(silly_title)
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--ip', help='Target IP Address', default='BLANK', type=str, required=True)
     parser.add_argument('-rpc', '--rpc_port', help='Target RPC Port', default=111, type=int, required=False)
@@ -28,19 +40,6 @@ def get_args():
     parser.add_argument('-http', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
     parser.add_argument('-https', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
     return parser.parse_args()
-
-
-# Visual Indicators
-class Bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 # Global Variables
@@ -72,15 +71,6 @@ https_filename = https_socket.replace('https://', '').replace('//', '').replace(
 original_start_time = time.time()
 current_process_time = time.time()
 output_summary = []
-mood = {
-        'start': f'{Bcolors.OKBLUE}{Bcolors.BOLD}{Bcolors.UNDERLINE}',
-        'header': f'{Bcolors.OKGREEN}{Bcolors.BOLD}{Bcolors.UNDERLINE}',
-        'good': f'{Bcolors.OKGREEN}{Bcolors.BOLD}',
-        'bad': f'{Bcolors.FAIL}{Bcolors.BOLD}',
-        'warning': f'{Bcolors.OKCYAN}{Bcolors.BOLD}',
-        'info': f'{Bcolors.OKBLUE}{Bcolors.BOLD}',
-        'end': f'{Bcolors.ENDC}'
-    }
 
 # Service / Port Definitions
 service_dict = {
@@ -240,23 +230,23 @@ def chmod(_path):
     try:
         os.chmod(_path, 0o0777)
     except Exception as e:
-        print(e)
+        print_with_intention(f'[!] Path CHMOD Failed: {_path}\n\tError: `{e}`')
 
 
 def build_dir_tree(_path):
     if os.path.exists(_path):
-        intention_print(f'[i] Results Path Already Exists: `{_path}`', 'info')
+        print_with_intention(f'[i] Results Path Already Exists: `{_path}`', 'info')
         return _path
     try:
         if _path[-1] == "/":
             Path(_path[:-1]).mkdir(parents=True)
         else:
             Path(_path).mkdir(parents=True)
-        intention_print(f'[+] Results Path Created: `{_path}`', 'good')
+        print_with_intention(f'[+] Results Path Created: `{_path}`', 'good')
         chmod(_path)
 
     except Exception as e:
-        intention_print(f'[-] Path Creation Error Details: `{e}`', 'bad')
+        print_with_intention(f'[-] Path Creation Error Details: `{e}`', 'bad')
         return _path
     return _path
 
@@ -269,16 +259,15 @@ def socket_updater(new_ip, new_port):
 
 
 def print_elapsed_time():
-    global original_start_time, output_summary
+    global original_start_time
     seconds = round(int(time.time() - original_start_time), 2)
     minutes = math.trunc(seconds / 60)
     remaining_seconds = math.trunc(seconds - (minutes * 60))
     if len(str(remaining_seconds)) != 2:
         remaining_seconds = f'0{remaining_seconds}'
     elapsed_time = f'{minutes}:{remaining_seconds}'
-    msg = f'\t\t[*] Total_Time Elapsed: `{elapsed_time}`'
-    output_summary.append(msg)
-    intention_print(msg, 'info')
+    msg = f'[*] Total_Time Elapsed: `{elapsed_time}`'
+    print_with_intention(msg, 'info')
     return time.time()
 
 
@@ -289,7 +278,7 @@ def http_response(_url):
 
 
 def get_live_ports():
-    global ip, port_list, output_root_dir, mood
+    global ip, port_list, output_root_dir
     if not os.path.exists(f"{output_root_dir}/nmap_summary"):
         return port_list
     file_in = open(f"{output_root_dir}/nmap_summary", 'r')
@@ -307,8 +296,7 @@ def get_live_ports():
     msg = '[i] Open Ports Detected:`\n'
     for port in port_list:
         msg += f'{port}\n'
-    output_summary.append(msg)
-    print(f'{mood["good"]}{msg}{mood["end"]}\n')
+    print_with_intention(msg)
 
 
 def get_live_sockets():
@@ -316,76 +304,65 @@ def get_live_sockets():
     get_live_ports()
     
     for port in port_list:
-        potential_sockets = [f'http://{ip}:{port}', 
-                f'https://{ip}:{port}']
+        potential_sockets = [f'http://{ip}:{port}', f'https://{ip}:{port}']
         for potential_socket in potential_sockets:
             try:
                 socket_response = http_response(potential_socket)
                 if int(socket_response[0]) < 400:
                     socket_dict[potential_socket] = socket_response[0]
-            except:
+            except Exception as e:
+                print_with_intention(f'[!] Socket `{potential_socket}` failed to respond.')
                 continue
 
 
 def execute_os_command(_cmd):
-    global suppression, suppression_list, output_summary, disabled_cmd_list, command_timeout
+    global suppression, suppression_list, disabled_cmd_list, command_timeout
     output, error = None, None
     for disabled_cmd in disabled_cmd_list:
         if disabled_cmd in _cmd:
-            msg = f'\t[i] `{_cmd}`'
-            intention_print(msg, 'info')
-            output_summary.append(msg)
+            msg = f'[i] Command Disabled: `{_cmd}`'
+            print_with_intention(msg)
             return msg, error
     for flagged_cmd in suppression_list:
         if flagged_cmd in _cmd:
             _cmd = _cmd + suppression
-    intention_print(f'\t[i] Attempting: `{_cmd}`', 'info')
+    print_with_intention(f'[i] Attempting: `{_cmd}`')
     try:
         results = subprocess.run(_cmd, shell=True, timeout=command_timeout)
         if results.returncode == 0:
-            exec_msg = f'\t\t[+] Execution: `Completed Successfully!`'
-            intention = 'good'
+            exec_msg = f'[+] Execution: `Completed Successfully!`'
         else:
-            exec_msg = f'\t\t[-] Process Failure: `STDOUT: {results.stdout} --> STDERR: {results.stderr}`'
-            intention = 'bad'
-        intention_print(exec_msg, intention)
+            exec_msg = f'[-] Process Failure:\n\t`STDOUT: {results.stdout}\n\tSTDERR: {results.stderr}`'
+        print_with_intention(exec_msg)
     except Exception as e:
-        exec_msg = f'\t\t[-] General Failure - Details: `{e}`'
-        intention_print(exec_msg, 'bad')
-    output_summary.append(exec_msg)
+        print_with_intention(f'[-] General Failure - Details: `{e}`')
     print_elapsed_time()
     return output, error
 
 
-def intention_print(_msg, _intention):
-    global mood
-    end = mood['end']
-    prefix = _msg.split('[', 1)[0]
-    postfix = _msg.split('`')[-1]
+def print_with_intention(_string, newline=True, tab=False):
+    global output_summary
+    new_line = "\n" if newline else " "
+    _tab = "\t" if tab else " "
 
-    tag, instruction, payload = None, None, None
-    if match := re.search(r'(\[.*?])(.*?)`(.*?)`', _msg, re.IGNORECASE):
-        try:
-            tag = match.group(1)
-            instruction = match.group(2)
-            payload = match.group(3)
-        except:
-            print(f"[i] Unformulated Print -->\n{_msg}")
-            return _msg
+    if _string.startswith("[i] "):
+        print(_tab + Fore.WHITE + Back.BLUE + "[i]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.WHITE + Back.BLUE + _string[4:] + Back.RESET + Fore.RESET + new_line)
+    elif _string.startswith("[+] ") or _string.startswith("[*] "):
+        print(_tab + Fore.BLACK + Back.GREEN + "[+]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.BLACK + Back.GREEN + _string[4:] + Fore.RESET + Back.RESET + new_line)
+    elif _string.startswith("[-] "):
+        print(_tab + Fore.BLACK + Back.YELLOW + "[i]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.BLACK + Back.YELLOW + _string[4:] + Fore.RESET + Back.RESET + new_line)
+    elif _string.startswith("[!] "):
+        print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
-    if not tag or not instruction or not payload:
-        return _msg
-
-    print(f"{prefix}"
-          f"{mood[_intention]}{tag}{end}"
-          f"{instruction}`"
-          f"{mood['warning']}{payload}{end}`"
-          f"{postfix}")
-    return _msg
+    output_summary.append(_string)
 
 
 def test_situation(port_str):
-    global service_dict, output_summary, suppression_list, scan_type
+    global service_dict, suppression_list, scan_type
     result = False
     command_sets = generate_command_dict()
     try:
@@ -395,9 +372,8 @@ def test_situation(port_str):
             try:
                 cmd_dict = command_sets[situation]['commands']
                 tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
-                msg = f'\n[{situation.upper()}] - Testing with tool set: `{tools}`'
-                output_summary.append(msg)
-                intention_print(msg, 'header')
+                msg = f'[i] Detected Protocol: {situation.upper()} - Testing with tool set: `{tools}`'
+                print_with_intention(msg)
                 for cmd in cmd_dict:
                     if scan_type.upper() in cmd_dict[cmd]:
                         try:
@@ -405,25 +381,20 @@ def test_situation(port_str):
                             execute_os_command(cmd)
                         except Exception as e:
                             result = False
-                            msg = f'\n\t[-] - Command set failure: {situation.upper()} Error: `{e}`\n'
-                            output_summary.append(msg)
-                            intention_print(msg, 'bad')
+                            msg = f'[-] Command set failure: {situation.upper()}\n\tError: `{e}`'
+                            print_with_intention(msg)
                     else:
-                        msg = f'\n\t[i] Disabled CMD: `{cmd}`'
-                        output_summary.append(msg)
-                        intention_print(msg, 'info')
+                        msg = f'[i] Disabled CMD: `{cmd}`'
+                        print_with_intention(msg)
             except Exception as e:
-                msg = f'\n\t[-] No module defined for {situation.upper()}, Error: `{e}`'
-                output_summary.append(msg)
-                intention_print(msg, 'bad')
+                msg = f'[-] No module defined for {situation.upper()}, Error: `{e}`'
+                print_with_intention(msg)
         except Exception as e:
-            msg = f'\n\t[-] No module defined for {port_str}, Error: `{e}`'
-            output_summary.append(msg)
-            intention_print(msg, 'bad')
+            msg = f'[-] No module defined for {port_str}, Error: `{e}`'
+            print_with_intention(msg)
     except Exception as e:
-        msg = f'\n\t[-] No port service defined in service_dict for : {port_str}, Error: `{e}`'
-        output_summary.append(msg)
-        intention_print(msg, 'bad')
+        msg = f'[-] No port service defined in service_dict for : {port_str}, Error: `{e}`'
+        print_with_intention(msg)
     return result
 
 
@@ -446,7 +417,7 @@ def main():
     build_output_structure()
 
     # Begin testing on all components.
-    intention_print(f'[+] TARGET: `{ip}`', 'start')
+    print_with_intention(f'[+] TARGET: `{ip}`', 'start')
     test_situation('initial')
     get_live_sockets()
     test_situation('all')
@@ -469,7 +440,7 @@ def main():
     # Write the output to the summary file for this run.
     f_out = open(f'{output_root_dir}/summary_{ip}', 'w')
     for summary_line in output_summary:
-        f_out.write(summary_line)
+        f_out.write(f'{summary_line}\n')
     f_out.close()
 
 

@@ -1,9 +1,9 @@
-# enumerator.py
+# Cspeakes Enum
 -----------------------
 
-Enumerator.py is a tool that completes some basic enumeration commands useful during initial discovery.
+`cspeakes_enum` is a tool that completes some basic enumeration commands useful during initial discovery.
 
-[?] `~# python3 enumerator.py`
+[?] `~# cspeakes_enum -h`
 
 ```shell
 usage: enumerator.py [-h] -i IP [-rpc RPC_PORT] [-s SCAN_TYPE] [-c COMMAND_TIMEOUT] [-ftp FTP_PORT] [-ssh SSH_PORT] [-smtp SMTP_PORT] [-dns DNS_PORT] [-pop POP_PORT]
