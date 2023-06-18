@@ -48,7 +48,7 @@ target <target_ip>
 
 If you find some further configurations such as different ports or options after the first scan's results are returned, you can rerun the enumerator alone without (see Full Usage below for all options):
 ```shell
-../enumerator/cspeakes_enum <see_extended_usage>
+<target_ip>/cspeakes_enumerator/cspeakes_enum <see_extended_usage>
 ```
 
 ## Extended Usage:
