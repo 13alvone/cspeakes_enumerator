@@ -336,8 +336,8 @@ def execute_os_command(_cmd):
         results = subprocess.run(_cmd, shell=True, timeout=command_timeout, stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE)
         if results.returncode == 0 and not results.stderr:
-            exec_msg = '[+] Execution: `Completed Successfully!`'
-            return exec_msg, results.stdout.decode()
+            exec_msg = f'[+] Execution: `Completed Successfully!`\n\t[^] `{results.stdout.decode()}`'
+            return exec_msg, None
         else:
             exec_msg = f'[!] Execution: `Encountered an error!`\n\tError: `{results.stderr.decode()}`'
 
