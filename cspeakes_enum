@@ -329,7 +329,7 @@ def execute_os_command(_cmd):
             _cmd = _cmd + suppression
     print_with_intention(f'[i] Attempting: `{_cmd}`')
 
-    if not ags.nosudo:
+    if not args.nosudo:
         _cmd = f'{superuser}{_cmd}'
 
     try:
