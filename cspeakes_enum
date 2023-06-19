@@ -293,7 +293,7 @@ def get_live_ports():
             except Exception as e:
                 print(e)
                 continue
-    msg = '[i] Open Ports Detected: `{", ".join(port_list)}`'
+    msg = f'[i] Open Ports Detected: `{", ".join(port_list)}`'
     print_with_intention(msg)
 
 
