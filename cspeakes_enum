@@ -51,7 +51,7 @@ suppression_list = ['masscan', 'dotdotpwn', ]
 disabled_cmd_list = ['dotdotpwn', 'nikto', 'masscan', ]
 port_list = []
 args = get_args()
-command_timeout = args.command_timeout
+cmd_timeout = args.command_timeout
 scan_type = args.scan_type
 ip = args.ip
 rpc_port = args.rpc_port
@@ -101,13 +101,17 @@ def generate_command_dict():
     global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_root, output_root_dir, args, initial_ports
 
-    initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} | grep '^[0-9]' | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$//")
+    initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
+                                       f"| grep '^[0-9]' "
+                                       f"| cut -d '/' -f 1 "
+                                       f"| tr '\n' ',' "
+                                       f"| sed s/,$//")
 
     command_sets_dict = {
         'initial': {
             'commands': {
                 f'nmap -p{initial_ports} -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
-                f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
+                f'masscan -p U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
             }
         },
         
@@ -319,13 +323,13 @@ def get_live_sockets():
 
 
 def execute_os_command(_cmd):
-    global args, suppression, suppression_list, disabled_cmd_list, command_timeout
-    output, error = None, None
+    global args, suppression, suppression_list, disabled_cmd_list, cmd_timeout
+
     for disabled_cmd in disabled_cmd_list:
         if disabled_cmd in _cmd:
             msg = f'[i] Command Disabled: `{_cmd}`'
             print_with_intention(msg)
-            return msg, error
+            return None, None
 
     for flagged_cmd in suppression_list:
         if flagged_cmd in _cmd:
@@ -336,21 +340,24 @@ def execute_os_command(_cmd):
         _cmd = f'{superuser}{_cmd}'
 
     try:
-        results = subprocess.run(_cmd, shell=True, timeout=command_timeout, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-        if results.returncode == 0 and not results.stderr:
-            exec_msg = f'[+] Execution: `Completed Successfully!`\n\t[^] `{results.stdout.decode()}`'
-            return exec_msg, None
-        else:
-            exec_msg = f'[!] Execution: `Encountered an error!`\n\tError: `{results.stderr.decode()}`'
+        results = subprocess.run(_cmd, shell=True, timeout=cmd_timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout = results.stdout.decode()
 
-        print_with_intention(exec_msg)
+        if results.returncode == 0 and not results.stderr:
+            print_with_intention(f'[+] Execution: `Completed Successfully!`\n\t[^] `{stdout}`')
+            print_elapsed_time()
+            return stdout, None
+
+        else:
+            print_with_intention(f'[!] Execution: `Encountered an error!`\n\tError: `{results.stderr.decode()}`')
+            print_elapsed_time()
+            return 'SystemExecutionError', results.stderr.decode()
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure - Details: `{e}`')
 
     print_elapsed_time()
-    return output, error
+    return None, None
 
 
 def print_with_intention(_string, newline=True, tab=False):
