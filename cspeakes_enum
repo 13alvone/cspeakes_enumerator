@@ -107,7 +107,7 @@ def generate_command_dict():
                                        f"| cut -d '/' -f 1 "
                                        f"| tr '\n' ',' "
                                        f"| sed s/,$//",
-                                       _print=False)
+                                       _print=False)[0]
 
     command_sets_dict = {
         'initial': {
