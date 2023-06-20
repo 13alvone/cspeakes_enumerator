@@ -105,7 +105,8 @@ def generate_command_dict():
                                        f"| grep '^[0-9]' "
                                        f"| cut -d '/' -f 1 "
                                        f"| tr '\n' ',' "
-                                       f"| sed s/,$//")
+                                       f"| sed s/,$//",
+                                       _print=False)
 
     command_sets_dict = {
         'initial': {
@@ -322,7 +323,7 @@ def get_live_sockets():
                 continue
 
 
-def execute_os_command(_cmd):
+def execute_os_command(_cmd, _print=True):
     global args, suppression, suppression_list, disabled_cmd_list, cmd_timeout
 
     for disabled_cmd in disabled_cmd_list:
@@ -334,7 +335,9 @@ def execute_os_command(_cmd):
     for flagged_cmd in suppression_list:
         if flagged_cmd in _cmd:
             _cmd = _cmd + suppression
-    print_with_intention(f'[i] Attempting: `{_cmd}`')
+
+    if _print:
+        print_with_intention(f'[i] Attempting: `{_cmd}`')
 
     if not args.nosudo:
         _cmd = f'{superuser}{_cmd}'
