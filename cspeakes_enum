@@ -106,7 +106,7 @@ def generate_command_dict():
     command_sets_dict = {
         'initial': {
             'commands': {
-                f'nmap -p{$initial_ports} -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
+                f'nmap -p{initial_ports} -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
                 f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
             }
         },
