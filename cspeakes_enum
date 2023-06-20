@@ -102,9 +102,9 @@ def generate_command_dict():
     command_sets_dict = {
         'initial': {
             'commands': {
-                f'nmap -p1-65535 -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG'],
-                f'nmap -Pn -p1-65535 {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
-                f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG'],
+                f'nmap -Pn -p1-65535 {ip} >> {output_root_dir}/nmap_summary_long': ['LONG'],
+                f"nmap -p$(nmap -p- --min-rate=1000 -T4 {ip} | grep '^[0-9]' | cut -d '/' -f 1 | tr '\n' ',' | sed s/,$//) -sV {ip} | tee nmap_summary_short": ['LONG', 'SHORT'],
+                f'masscan -p1-65535,U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
             }
         },
         
