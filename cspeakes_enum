@@ -280,29 +280,8 @@ def http_response(_url):
     return f"{r.status_code}", f"{content_type}"
 
 
-def get_live_ports():
-    global ip, port_list, output_root_dir
-    if not os.path.exists(f"{output_root_dir}/nmap_summary"):
-        return port_list
-    file_in = open(f"{output_root_dir}/nmap_summary", 'r')
-    for line in file_in:
-        y = re.match(r'(^\d+)/tcp|udp|sctp', line)
-        if y:
-            try:
-                result_tuple = y.groups()
-                port = result_tuple[0]
-                if port not in port_list:
-                    port_list.append(port)
-            except Exception as e:
-                print(e)
-                continue
-    msg = f'[i] Open Ports Detected: `{", ".join(port_list)}`'
-    print_with_intention(msg)
-
-
 def get_live_sockets():
     global ip, port_list, socket_dict
-    get_live_ports()
     
     for port in port_list:
         potential_sockets = [f'http://{ip}:{port}', f'https://{ip}:{port}']
@@ -340,17 +319,20 @@ def execute_os_command(_cmd, _print=True):
         stdout = results.stdout.decode()
 
         if results.returncode == 0 and not results.stderr:
-            print_with_intention(f'[+] Execution Completed Successfully!`\n[-] {stdout}')
+            print_with_intention(f'[+] Execution Completed Successfully!')
+            print_with_intention(f'[-] {stdout}')
             print_elapsed_time()
             return stdout, None
 
         else:
-            print_with_intention(f'[!] Execution Encountered an Error!`\n[-] {results.stderr.decode()}')
+            print_with_intention(f'[!] Execution Encountered an Error.')
+            print_with_intention(f'[-] {results.stderr.decode()}')
             print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
 
     except Exception as e:
-        print_with_intention(f'[!] General Execution Failure - Details: `{e}`')
+        print_with_intention(f'[!] General Execution Failure.')
+        print_with_intention(f'[-] {e}')
 
     print_elapsed_time()
     return None, None
@@ -441,6 +423,9 @@ def main():
                                        f"| tr '\n' ',' "
                                        f"| sed s/,$//",
                                        _print=False)[0]
+
+    port_list = [x.lstrip(' ').lstrip(',').rstrip(' ').rstrip(',') for x in initial_ports.split(",")]
+
     test_situation('initial')
     get_live_sockets()
     test_situation('all')
