@@ -101,14 +101,6 @@ def generate_command_dict():
     global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_root, output_root_dir, args, initial_ports
 
-    print(f'[+] Performing Initial Port Discovery. Please wait...')
-    initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
-                                       f"| grep '^[0-9]' "
-                                       f"| cut -d '/' -f 1 "
-                                       f"| tr '\n' ',' "
-                                       f"| sed s/,$//",
-                                       _print=False)[0]
-
     command_sets_dict = {
         'initial': {
             'commands': {
@@ -436,12 +428,19 @@ def build_output_structure():
 
 
 def main():
-    global ip, output_summary, port_list, output_root_dir, socket_dict
+    global ip, output_summary, port_list, output_root_dir, socket_dict, initial_ports
     generate_command_dict()
     build_output_structure()
 
     # Begin testing on all components.
     print_with_intention(f'[+] TARGET: `{ip}`', 'start')
+    print_with_intention(f'[+] Performing Initial Port Discovery. Please wait...')
+    initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
+                                       f"| grep '^[0-9]' "
+                                       f"| cut -d '/' -f 1 "
+                                       f"| tr '\n' ',' "
+                                       f"| sed s/,$//",
+                                       _print=False)[0]
     test_situation('initial')
     get_live_sockets()
     test_situation('all')
