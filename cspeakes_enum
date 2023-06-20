@@ -101,6 +101,7 @@ def generate_command_dict():
     global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_root, output_root_dir, args, initial_ports
 
+    print(f'[+] Performing Initial Port Discovery. Please wait...')
     initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
                                        f"| grep '^[0-9]' "
                                        f"| cut -d '/' -f 1 "
