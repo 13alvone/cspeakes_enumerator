@@ -340,12 +340,12 @@ def execute_os_command(_cmd, _print=True):
         stdout = results.stdout.decode()
 
         if results.returncode == 0 and not results.stderr:
-            print_with_intention(f'[+] Execution: `Completed Successfully!`\n\t[^] `{stdout}`')
+            print_with_intention(f'[+] Execution Completed Successfully!`\n[-] {stdout}')
             print_elapsed_time()
             return stdout, None
 
         else:
-            print_with_intention(f'[!] Execution: `Encountered an error!`\n\tError: `{results.stderr.decode()}`')
+            print_with_intention(f'[!] Execution Encountered an Error!`\n[-] {results.stderr.decode()}')
             print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
 
@@ -434,7 +434,7 @@ def main():
 
     # Begin testing on all components.
     print_with_intention(f'[+] TARGET: `{ip}`', 'start')
-    print_with_intention(f'[+] Performing Initial Port Discovery. Please wait...')
+    print_with_intention(f'[i] Performing Initial Port Discovery. Please wait...')
     initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
                                        f"| grep '^[0-9]' "
                                        f"| cut -d '/' -f 1 "
