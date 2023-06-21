@@ -424,7 +424,8 @@ def main():
                                        f"| sed s/,$//",
                                        _print=False)[0]
 
-    port_list = [x.lstrip(' ').lstrip(',').rstrip(' ').rstrip(',') for x in initial_ports.split(",")]
+    # port_list = [x.lstrip(' ').lstrip(',').rstrip(' ').rstrip(',') for x in initial_ports.split(",")]
+    port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]  # Live Testing an inline fix
 
     test_situation('initial')
     get_live_sockets()
