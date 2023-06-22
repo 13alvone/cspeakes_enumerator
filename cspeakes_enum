@@ -48,7 +48,7 @@ wordlist_root = 'wordlists'
 suppression = ' >/dev/null 2>&1'    # Suppression, change if needed
 superuser = 'sudo '                 # Sudo Privs if required.
 suppression_list = ['masscan', 'dotdotpwn', ]
-disabled_cmd_list = ['dotdotpwn', ]
+disabled_cmd_list = ['dotdotpwn', 'masscan']
 port_list = []
 args = get_args()
 cmd_timeout = args.command_timeout
@@ -317,22 +317,25 @@ def execute_os_command(_cmd, _print=True):
     try:
         results = subprocess.run(_cmd, shell=True, timeout=cmd_timeout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout = results.stdout.decode()
+        stderr = results.stderr.decode()
 
         if results.returncode == 0 and not results.stderr:
             print_with_intention(f'[+] Execution Completed Successfully!')
-            print_with_intention(f'[-] {stdout}')
+            if stdout:
+                print_with_intention(f'[^] {stdout}')
             print_elapsed_time()
             return stdout, None
 
         else:
             print_with_intention(f'[!] Execution Encountered an Error.')
-            print_with_intention(f'[-] {results.stderr.decode()}')
+            if stderr:
+                print_with_intention(f'[*] {stderr}')
             print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure.')
-        print_with_intention(f'[-] {e}')
+        print_with_intention(f'[*] {e}')
 
     print_elapsed_time()
     return None, None
@@ -343,17 +346,20 @@ def print_with_intention(_string, newline=True, tab=False):
     new_line = "\n" if newline else " "
     _tab = "\t" if tab else " "
 
-    if _string.startswith("[i] "):
+    if _string.startswith("[i] "):      # Informational Statement
         print(_tab + Fore.WHITE + Back.BLUE + "[i]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.BLUE + _string[4:] + Back.RESET + Fore.RESET + new_line)
-    elif _string.startswith("[+] ") or _string.startswith("[*] "):
+    elif _string.startswith("[+] "):    # Definitive Statement
         print(_tab + Fore.BLACK + Back.GREEN + "[+]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.BLACK + Back.GREEN + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[-] "):
-        print(_tab + Fore.BLACK + Back.YELLOW + "[i]" + Back.RESET + Fore.RESET + " " +
-              Style.RESET_ALL + Fore.BLACK + Back.YELLOW + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[!] "):
+    elif _string.startswith("[^] "):    # Addendum or Continuation
+        print("\t" + Fore.BLACK + Back.CYAN + "[^]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.BLACK + Back.CYAN + _string[4:] + Fore.RESET + Back.RESET + new_line)
+    elif _string.startswith("[!] "):    # Error or Alert
         print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
+    elif _string.startswith("[*] "):    # Error Details
+        print("\t" + Fore.WHITE + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
     output_summary.append(_string)
@@ -379,20 +385,19 @@ def test_situation(port_str):
                             execute_os_command(cmd)
                         except Exception as e:
                             result = False
-                            msg = f'[-] Command set failure: {situation.upper()}\n\tError: `{e}`'
-                            print_with_intention(msg)
+                            print_with_intention(f'[!] Command set failure for protocol: `{situation.upper()}`')
+                            print_with_intention(f'[*] Error: `{e}`')
                     else:
-                        msg = f'[i] Disabled CMD: `{cmd}`'
-                        print_with_intention(msg)
+                        print_with_intention(f'[i] Disabled CMD: `{cmd}`')
             except Exception as e:
-                msg = f'[-] No module defined for {situation.upper()}, Error: `{e}`'
-                print_with_intention(msg)
+                print_with_intention(f'[!] No module defined for {situation.upper()}')
+                print_with_intention(f'Error: `{e}`')
         except Exception as e:
-            msg = f'[-] No module defined for {port_str}, Error: `{e}`'
-            print_with_intention(msg)
+            print_with_intention(f'[!] No module defined for {port_str}')
+            print_with_intention(f'Error: `{e}`')
     except Exception as e:
-        msg = f'[-] No port service defined in service_dict for : {port_str}, Error: `{e}`'
-        print_with_intention(msg)
+        print_with_intention(f'[!] No port service defined in service_dict for : {port_str}')
+        print_with_intention(f'Error: `{e}`')
     return result
 
 
