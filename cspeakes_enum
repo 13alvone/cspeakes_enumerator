@@ -48,7 +48,11 @@ wordlist_root = 'wordlists'
 suppression = ' >/dev/null 2>&1'    # Suppression, change if needed
 superuser = 'sudo '                 # Sudo Privs if required.
 suppression_list = ['masscan', 'dotdotpwn', ]
-disabled_cmd_list = ['dotdotpwn', 'masscan', 'nikto']
+disabled_cmd_dict = {
+    'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
+    'masscan': 'Disabled due to runtime.',
+    'nikto': 'Disabled due to OSCP requirements.'
+}
 port_list = []
 args = get_args()
 cmd_timeout = args.command_timeout
@@ -296,9 +300,9 @@ def get_live_sockets():
 
 
 def execute_os_command(_cmd, _print=True, _print_et=True):
-    global args, suppression, suppression_list, disabled_cmd_list, cmd_timeout
+    global args, suppression, suppression_list, disabled_cmd_dict, cmd_timeout
 
-    for disabled_cmd in disabled_cmd_list:
+    for disabled_cmd in disabled_cmd_dict:
         if disabled_cmd in _cmd:
             msg = f'[*] Command Disabled: `{_cmd}`'
             print_with_intention(msg)
@@ -362,14 +366,14 @@ def print_with_intention(_string, newline=True, tab=False):
         print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
     elif _string.startswith("[*] "):    # Error Details or Configuration Alert
-        print("\t" + Fore.WHITE + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
-              Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
+        print("\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
     output_summary.append(_string)
 
 
 def test_situation(port_str):
-    global service_dict, suppression_list, scan_type
+    global service_dict, suppression_list, scan_type, disabled_cmd_dict
     result = False
     command_sets = generate_command_dict()
     try:
@@ -378,9 +382,9 @@ def test_situation(port_str):
             tool_set = set(tool.split(" ")[0] for tool in command_sets[situation]['commands'])
             try:
                 cmd_dict = command_sets[situation]['commands']
-                tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
-                msg = f'[i] Detected Protocol: {situation.upper()} - Testing with tool set: `{tools}`'
-                print_with_intention(msg)
+                all_tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
+                tools = [item for item in all_tools if item not in disabled_cmd_dict]
+                print_with_intention(f'[i] Detected Protocol: {situation.upper()} --> Testing with Tools: `{tools}`')
                 for cmd in cmd_dict:
                     if scan_type.upper() in cmd_dict[cmd]:
                         try:
