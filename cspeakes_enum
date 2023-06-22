@@ -20,6 +20,16 @@ obligatory_title = '''
          /_/                                                                                               
 '''
 
+# User Configurations
+suppression_list = ['masscan', 'dotdotpwn', ]       # List of tools that should use a suppression
+suppression = ' >/dev/null 2>&1'                    # Suppression standard postfix
+disabled_cmd_dict = {                               # <Tool>: <Reason_For_Disabled_State>
+    'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
+    'masscan': 'Disabled due to runtime.',
+    'nikto': 'Disabled due to OSCP requirements.'
+}
+
+
 def get_args():
     global obligatory_title
     print(obligatory_title)
@@ -45,14 +55,7 @@ def get_args():
 
 # Global Variables
 wordlist_root = 'wordlists'
-suppression = ' >/dev/null 2>&1'    # Suppression, change if needed
 superuser = 'sudo '                 # Sudo Privs if required.
-suppression_list = ['masscan', 'dotdotpwn', ]
-disabled_cmd_dict = {
-    'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
-    'masscan': 'Disabled due to runtime.',
-    'nikto': 'Disabled due to OSCP requirements.'
-}
 port_list = []
 args = get_args()
 cmd_timeout = args.command_timeout
@@ -101,7 +104,7 @@ service_dict = {
 
 
 # Command Sets
-def generate_command_dict():
+def generate_command_dict():    # Dynamically generates command sets based on the provided and identified data.
     global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
     global wordlist_root, output_root_dir, args, initial_ports
 
@@ -383,7 +386,7 @@ def test_situation(port_str):
             try:
                 cmd_dict = command_sets[situation]['commands']
                 all_tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
-                tools = [item for item in all_tools if item not in disabled_cmd_dict]
+                tools = [item for item in all_tools.split(', ') if item not in disabled_cmd_dict]
                 print_with_intention(f'[i] Detected Protocol: {situation.upper()} --> Testing with Tools: `{tools}`')
                 for cmd in cmd_dict:
                     if scan_type.upper() in cmd_dict[cmd]:
@@ -436,8 +439,7 @@ def main():
                                        f"| sed s/,$//",
                                        _print=False, _print_et=False)[0]
 
-    # port_list = [x.lstrip(' ').lstrip(',').rstrip(' ').rstrip(',') for x in initial_ports.split(",")]
-    port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]  # Live Testing an inline fix
+    port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]
 
     test_situation('initial')
     get_live_sockets()
