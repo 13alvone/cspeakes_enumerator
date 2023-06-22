@@ -295,7 +295,7 @@ def get_live_sockets():
                 continue
 
 
-def execute_os_command(_cmd, _print=True):
+def execute_os_command(_cmd, _print=True, _print_et=True):
     global args, suppression, suppression_list, disabled_cmd_list, cmd_timeout
 
     for disabled_cmd in disabled_cmd_list:
@@ -320,24 +320,27 @@ def execute_os_command(_cmd, _print=True):
         stderr = results.stderr.decode()
 
         if results.returncode == 0 and not results.stderr:
-            print_with_intention(f'[^] Execution Completed Successfully!')
             if stdout:
                 print_with_intention(f'[^] {stdout}')
-            print_elapsed_time()
+            print_with_intention(f'[^] Execution Completed Successfully!')
+            if _print_et:
+                print_elapsed_time()
             return stdout, None
 
         else:
             print_with_intention(f'[!] Execution Encountered an Error.')
             if stderr:
                 print_with_intention(f'[*] {stderr}')
-            print_elapsed_time()
+            if _print_et:
+                print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure.')
         print_with_intention(f'[*] {e}')
 
-    print_elapsed_time()
+    if _print_et:
+        print_elapsed_time()
     return None, None
 
 
@@ -421,13 +424,13 @@ def main():
 
     # Begin testing on all components.
     print_with_intention(f'[+] TARGET: `{ip}`', 'start')
-    print_with_intention(f'[i] Performing Initial Port Discovery. Please wait...')
+    print_with_intention(f'[i] Performing Initial Port Discovery. Please wait up to 5 minutes...')
     initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
                                        f"| grep '^[0-9]' "
                                        f"| cut -d '/' -f 1 "
                                        f"| tr '\n' ',' "
                                        f"| sed s/,$//",
-                                       _print=False)[0]
+                                       _print=False, _print_et=False)[0]
 
     # port_list = [x.lstrip(' ').lstrip(',').rstrip(' ').rstrip(',') for x in initial_ports.split(",")]
     port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]  # Live Testing an inline fix
