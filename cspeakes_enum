@@ -104,66 +104,66 @@ def generate_command_dict():
     command_sets_dict = {
         'initial': {
             'commands': {
-                f'nmap -p{initial_ports} -sC -sV -O -A {ip} >> {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
-                f'masscan -p U:1-65535 {ip} --rate=1000 -oL {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
+                f'nmap -p{initial_ports} -sC -sV -O -A {ip} | tee -a {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
+                f'masscan -p U:1-65535 {ip} --rate=1000 | tee -a {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
             }
         },
         
         'dns': {
             'commands': {
-                f'dig axfr {ip} > {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'dig axfr {ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
                 f'nmap -n --script '
                 f'"(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" '
-                f'{ip} >> {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
-                f'dnsrecon -r {ip}/24 -n {ip} >> {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'{ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
+                f'dnsrecon -r {ip}/24 -n {ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
                 f'dnsrecon -d {output_root_dir}/dns_summary_2 -a -n {ip}': ['LONG', 'SHORT'],
             }
         },
 
         'ftp': {
             'commands': {
-                f'nmap --script ftp-* -p {args.ftp_port} {ip}':['LONG', 'SHORT'],
+                f'nmap --script ftp-* -p {args.ftp_port} {ip} | tee -a {output_root_dir}/ftp_summary':['LONG', 'SHORT'],
             }
         },
 
         'smtp': {
             'commands': {
                 f'nmap –script smtp-commands,smtp-enum-users -p 25 {ip} '
-                f'>> {output_root_dir}/smtp_summary': ['LONG', 'SHORT'],
+                f'| tee {output_root_dir}/smtp_summary': ['LONG', 'SHORT'],
             }
         },
 
         'http': {
             'commands': {
                 f'dirb {http_socket} {wordlist_root}/small.txt -x extensions.txt '
-                f'-r -l -S -i -f -o {output_root_dir}/dirb_summary': ['LONG', 'SHORT'],
+                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG', 'SHORT'],
                 f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q '
-                f'-r {output_root_dir}/dotdotpwn_summary': ['LONG', 'SHORT'],
-                f'nikto -h {http_socket} -output {output_root_dir}/nikto_summary.txt': ['LONG', 'SHORT'],
+                f'| tee -a {output_root_dir}/dotdotpwn_summary': ['LONG', 'SHORT'],
+                f'nikto -h {http_socket} | tee -a {output_root_dir}/nikto_summary.txt': ['LONG', 'SHORT'],
                 f'gobuster dir -u {http_socket} -w {wordlist_root}/small.txt '
-                f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" | tee -a '
                 f'{output_root_dir}/gobuster_summary': ['LONG', 'SHORT'],
                 f'dirb {http_socket} {wordlist_root}/common.txt -x extensions.txt '
-                f'-r -l -S -i -f -o {output_root_dir}/dirb_summary': ['LONG'],
+                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG'],
             }
         },
 
         'https': {
             'commands': {
                 f'dirb {https_socket} {wordlist_root}/small.txt -x extensions.txt '
-                f'-r -l -S -i -f -o {output_root_dir}/dirb_{https_filename}': ['LONG'],
-                f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q -r '
+                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}': ['LONG'],
+                f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q | tee -a '
                 f'{output_root_dir}/dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
-                f'nikto -h {https_socket.split(":")[0]} -output '
+                f'nikto -h {https_socket.split(":")[0]} | tee -a '
                 f'{output_root_dir}/nikto_{https_filename}.txt': ['LONG', 'SHORT'],
                 f'gobuster dir -u {https_socket} -w {wordlist_root}/small.txt '
-                f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" -o '
+                f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" | tee -a '
                 f'{output_root_dir}/gobuster_{https_filename}': ['LONG', 'SHORT'],
                 f'dirb {https_socket} {wordlist_root}/common.txt -x extensions.txt '
-                f'-r -l -S -i -f -o {output_root_dir}/dirb_{https_filename}': ['LONG'],
-                f'sslyze --regular {https_socket.replace("https://", "")} >> '
+                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}': ['LONG'],
+                f'sslyze --regular {https_socket.replace("https://", "")} | tee -a '
                 f'{output_root_dir}/sslyze_{https_filename}': ['LONG', 'SHORT'],
-                f'tlssled {ip} {https_port} >> {output_root_dir}/tlssled_{https_filename}': ['LONG', 'SHORT'],
+                f'tlssled {ip} {https_port} | tee -a {output_root_dir}/tlssled_{https_filename}': ['LONG', 'SHORT'],
             }
         },
 
@@ -171,43 +171,43 @@ def generate_command_dict():
             'commands': {
                 f'gobuster dir -u {http_socket}/cgi-bin/ -w {wordlist_root}/small.txt '
                 f'-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 '
-                f'-o {output_root_dir}/cgi-bin_summary': ['LONG', 'SHORT']
+                f'| tee -a {output_root_dir}/cgi-bin_summary': ['LONG', 'SHORT']
             }
         },
 
         'rpc': {
             'commands': {
-                f'rpcinfo -p {ip} >> {output_root_dir}/rpc_summary': ['LONG', 'SHORT'],
+                f'rpcinfo -p {ip} | tee -a {output_root_dir}/rpc_summary': ['LONG', 'SHORT'],
             }
         },
 
         'smb': {
             'commands': {
-                f'nbtscan -r {ip} >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
-                f'enum4linux -a {ip} >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
-                f'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} >> '
+                f'nbtscan -r {ip} | tee -a {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'enum4linux -a {ip} | tee -a {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} | tee -a '
                 f'{output_root_dir}/smb_summary': ['LONG', 'SHORT'],
                 f'nmap {ip} --script smb-enum-domains.nse,smb-enum-groups.nse,'
                 f'smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,'
                 f'smb-mbenum.nse,smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,'
                 f'smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,'
                 f'smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,'
-                f'smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse >> {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
+                f'smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse | tee -a {output_root_dir}/smb_all': ['LONG', 'SHORT'],
             }
         },
 
         'snmp': {
             'commands': {
-                f'snmpwalk -c public -v1 {ip} >> {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
-                f'snmpcheck -t {ip} -c public >> -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
-                f'onesixtyone {ip} public >> -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+                f'snmpwalk -c public -v1 {ip} | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+                f'snmpcheck -t {ip} -c public | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
+                f'onesixtyone {ip} public | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
             }
         },
 
         'oracle': {
             'commands': {
-                f'tnscmd10g version -h {ip} >> {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
-                f'tmscmd10g status -h {ip} >> {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
+                f'tnscmd10g version -h {ip} | tee -a {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
+                f'tmscmd10g status -h {ip} | tee -a {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
             },
         },
 
@@ -215,7 +215,7 @@ def generate_command_dict():
             'commands': {
                 f'nmap -sV -Pn -vv {ip} -p 3306 --script mysql-audit,mysql-databases,'
                 f'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,'
-                f'mysql-variables,mysql-vuln-cve2012-2122 >> {output_root_dir}/mysql_summary': ['LONG', 'SHORT'],
+                f'mysql-variables,mysql-vuln-cve2012-2122 | tee -a {output_root_dir}/mysql_summary': ['LONG', 'SHORT'],
             }
         },
 
