@@ -269,7 +269,7 @@ def print_elapsed_time():
     if len(str(remaining_seconds)) != 2:
         remaining_seconds = f'0{remaining_seconds}'
     elapsed_time = f'{minutes}:{remaining_seconds}'
-    msg = f'[*] Total_Time Elapsed: `{elapsed_time}`'
+    msg = f'[^] Total_Time Elapsed: `{elapsed_time}`'
     print_with_intention(msg, 'info')
     return time.time()
 
@@ -300,7 +300,7 @@ def execute_os_command(_cmd, _print=True):
 
     for disabled_cmd in disabled_cmd_list:
         if disabled_cmd in _cmd:
-            msg = f'[i] Command Disabled: `{_cmd}`'
+            msg = f'[*] Command Disabled: `{_cmd}`'
             print_with_intention(msg)
             return None, None
 
@@ -320,7 +320,7 @@ def execute_os_command(_cmd, _print=True):
         stderr = results.stderr.decode()
 
         if results.returncode == 0 and not results.stderr:
-            print_with_intention(f'[+] Execution Completed Successfully!')
+            print_with_intention(f'[^] Execution Completed Successfully!')
             if stdout:
                 print_with_intention(f'[^] {stdout}')
             print_elapsed_time()
@@ -358,7 +358,7 @@ def print_with_intention(_string, newline=True, tab=False):
     elif _string.startswith("[!] "):    # Error or Alert
         print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[*] "):    # Error Details
+    elif _string.startswith("[*] "):    # Error Details or Configuration Alert
         print("\t" + Fore.WHITE + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
