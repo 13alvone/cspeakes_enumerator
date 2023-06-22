@@ -397,13 +397,13 @@ def test_situation(port_str):
                     else:
                         print_with_intention(f'[i] Disabled CMD: `{cmd}`')
             except Exception as e:
-                print_with_intention(f'[!] No module defined for {situation.upper()}')
+                print_with_intention(f'[!] No module defined for situation `{situation.upper()}`')
                 print_with_intention(f'Error: `{e}`')
         except Exception as e:
-            print_with_intention(f'[!] No module defined for {port_str}')
+            print_with_intention(f'[!] No module defined for port `{port_str}`')
             print_with_intention(f'Error: `{e}`')
     except Exception as e:
-        print_with_intention(f'[!] No port service defined in service_dict for : {port_str}')
+        print_with_intention(f'[!] No port service defined in service_dict for `{port_str}`')
         print_with_intention(f'Error: `{e}`')
     return result
 
