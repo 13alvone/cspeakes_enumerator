@@ -297,17 +297,16 @@ def get_live_sockets():
         potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
         for potential_socket, _protocol in potential_sockets.items():
             try:
+                print_with_intention(f'[i] TESTING: Socket response `{socket_response[0]}`')
                 socket_response = http_response(potential_socket)
+                socket_dict[f'{potential_socket}'] = f'{port}'
+                service_dict[f'{port}'] = f'{_protocol}'
+                print_with_intention(f'[+] Socket `{potential_socket}` responded with a `{socket_response[0]}`.')
+                print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
 
-                if int(socket_response[0]) < 400:
-                    print(f'TESTING: Socket response `{socket_response[0]}`')   # Testing Only
-                    socket_dict[f'{potential_socket}'] = f'{port}'
-                    service_dict[f'{port}'] = f'{_protocol}'
-
-                    print_with_intention(f'[+] Socket `{potential_socket}` responded with a `{socket_response[0]}`.')
-                    print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
             except Exception as e:
                 print_with_intention(f'[*] Socket `{potential_socket}` failed to respond. Skipping...')
+                print_with_intention(f'[^] Error Details: `{e}`')
                 continue
 
 
