@@ -297,7 +297,6 @@ def get_live_sockets():
         potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
         for potential_socket, _protocol in potential_sockets.items():
             try:
-                print_with_intention(f'[i] TESTING: Socket response `{socket_response[0]}`')
                 socket_response = http_response(potential_socket)
                 socket_dict[f'{potential_socket}'] = f'{port}'
                 service_dict[f'{port}'] = f'{_protocol}'
