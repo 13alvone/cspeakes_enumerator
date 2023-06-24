@@ -300,14 +300,10 @@ def get_live_sockets():
                 socket_response = http_response(potential_socket)
 
                 if int(socket_response[0]) < 400:
-                    socket_dict[potential_socket] = f'{port}'
+                    socket_dict[f'{potential_socket}'] = f'{port}'
+                    service_dict[f'{port}'] = f'{_protocol}'
 
-                    if _protocol == 'http':
-                        service_dict[f'{port}'] = 'http'
-                    elif _protocol == 'https':
-                        service_dict[f'{port}'] == 'https'
-
-                    print_with_intention(f'[+] Socket `{potential_socket}` responded with a `{socket_response[0]}`!')
+                    print_with_intention(f'[+] Socket `{potential_socket}` responded with a `{socket_response[0]}`.')
                     print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
             except Exception as e:
                 print_with_intention(f'[*] Socket `{potential_socket}` failed to respond. Skipping...')
@@ -353,6 +349,11 @@ def execute_os_command(_cmd, _print=True, _print_et=True):
             if _print_et:
                 print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
+
+    except SystemExcecutionError as e:
+        print_with_intention(f'[!] System Execution Error: `{e}`')
+        print_with_intention(f'[x] Exiting due to system error or permissions issue.')
+        print_with_intention(f'[^] Ensure you are running in a shell and not an IDE.')
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure.')
