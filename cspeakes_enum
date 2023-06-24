@@ -54,6 +54,8 @@ def get_args():
 
 
 # Global Variables
+script_path = os.path.abspath(__file__)
+script_dir = os.path.dirname(script_path)
 wordlist_root = 'wordlists'
 superuser = 'sudo '                 # Sudo Privs if required.
 port_list = []
@@ -266,6 +268,7 @@ def socket_updater(new_ip, new_port):
     ip = new_ip
     http_port = new_port
     https_port = new_port
+    generate_command_dict()
 
 
 def print_elapsed_time():
@@ -288,18 +291,26 @@ def http_response(_url):
 
 
 def get_live_sockets():
-    global ip, port_list, socket_dict
+    global ip, port_list, socket_dict, service_dict
     
     for port in port_list:
-        potential_sockets = [f'http://{ip}:{port}', f'https://{ip}:{port}']
-        for potential_socket in potential_sockets:
+        potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
+        for potential_socket, _protocol in potential_sockets.items():
             try:
                 socket_response = http_response(potential_socket)
+
                 if int(socket_response[0]) < 400:
-                    socket_dict[potential_socket] = socket_response[0]
-                    print_with_intention(f'[+] Socket `{potential_socket}` discovered!')
+                    socket_dict[potential_socket] = f'{port}'
+
+                    if _protocol == 'http':
+                        service_dict[f'{port}'] = 'http'
+                    elif _protocol == 'https':
+                        service_dict[f'{port}'] == 'https'
+
+                    print_with_intention(f'[+] Socket `{potential_socket}` responded with a `{socket_response[0]}`!')
+                    print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
             except Exception as e:
-                print_with_intention(f'[*] Socket `{potential_socket}` failed to respond.')
+                print_with_intention(f'[*] Socket `{potential_socket}` failed to respond. Skipping...')
                 continue
 
 
@@ -357,19 +368,24 @@ def print_with_intention(_string, newline=True, tab=False):
     new_line = "\n" if newline else " "
     _tab = "\t" if tab else " "
 
-    if _string.startswith("[i] "):      # Informational Statement
+    # Informational Statement
+    if _string.startswith("[i] "):
         print(_tab + Fore.WHITE + Back.BLUE + "[i]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.BLUE + _string[4:] + Back.RESET + Fore.RESET + new_line)
-    elif _string.startswith("[+] "):    # Definitive Statement
+    # Declarative Statement
+    elif _string.startswith("[+] "):
         print(_tab + Fore.BLACK + Back.GREEN + "[+]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.BLACK + Back.GREEN + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[^] "):    # Addendum or Continuation
+    # Addendum or Continuation
+    elif _string.startswith("[^] "):
         print("\t" + Fore.BLACK + Back.CYAN + "[^]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.BLACK + Back.CYAN + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[!] "):    # Error or Alert
+    # Error or Alert Notification
+    elif _string.startswith("[!] "):
         print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
-    elif _string.startswith("[*] "):    # Error Details or Configuration Alert
+    # Error Details or Configuration Alert
+    elif _string.startswith("[*] ") or _string.startswith("[x] ") or _string.startswith("[X] "):
         print("\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
@@ -448,18 +464,13 @@ def main():
 
     # Test each identified socket.
     initial_result = False
-    if len(socket_dict) != 0:
-        for _socket in socket_dict.keys():
-            socket_updater(ip, _socket.split(':')[1])
-            if test_situation('80'):    # Test each socket for HTTP
-                initial_result = True
-    if initial_result:
-        for port in port_list:
-            if port != '80':
-                test_situation(port)
-    else:
-        for port in port_list:
-            test_situation(port)
+    if socket_dict:
+        for _socket, _port in socket_dict.items():
+            test_situation(f'{_port}')
+
+    for _port in port_list:
+        if service_dict[_port] not in ['http', 'https']:
+            test_situation(_port)
 
     # Write the output to the summary file for this run.
     f_out = open(f'{output_root_dir}/summary_{ip}', 'w')
