@@ -258,7 +258,7 @@ def build_dir_tree(_path):
         chmod(_path)
 
     except Exception as e:
-        print_with_intention(f'[-] Path Creation Error Details: `{e}`', 'bad')
+        print_with_intention(f'[!] Path Creation Error Details: `{e}`', 'bad')
         return _path
     return _path
 
@@ -305,7 +305,7 @@ def get_live_sockets():
 
             except Exception as e:
                 print_with_intention(f'[*] Socket `{potential_socket}` failed to respond. Skipping...')
-                print_with_intention(f'[^] Error Details: `{e}`')
+                print_with_intention(f'[x] Error Details: `{e}`')
                 continue
 
 
@@ -385,8 +385,12 @@ def print_with_intention(_string, newline=True, tab=False):
         print(_tab + Fore.WHITE + Back.RED + "[!]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
     # Error Details or Configuration Alert
-    elif _string.startswith("[*] ") or _string.startswith("[x] ") or _string.startswith("[X] "):
+    elif _string.startswith("[*] "):
         print("\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
+    # System Errors
+    elif _string.startswith("[x] ") or _string.startswith("[X] "):
+        print("\t\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
     output_summary.append(_string)
