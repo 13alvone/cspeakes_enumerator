@@ -297,6 +297,7 @@ def get_live_sockets():
                 socket_response = http_response(potential_socket)
                 if int(socket_response[0]) < 400:
                     socket_dict[potential_socket] = socket_response[0]
+                    print_with_intention(f'[+] Socket `{potential_socket}` discovered!')
             except Exception as e:
                 print_with_intention(f'[*] Socket `{potential_socket}` failed to respond.')
                 continue
