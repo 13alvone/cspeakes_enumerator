@@ -300,6 +300,7 @@ def get_live_sockets():
                 socket_response = http_response(potential_socket)
 
                 if int(socket_response[0]) < 400:
+                    print(f'TESTING: Socket response `{socket_response[0]}`')   # Testing Only
                     socket_dict[f'{potential_socket}'] = f'{port}'
                     service_dict[f'{port}'] = f'{_protocol}'
 
