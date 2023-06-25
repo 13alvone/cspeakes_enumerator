@@ -264,10 +264,12 @@ def build_dir_tree(_path):
 
 
 def socket_updater(new_ip, new_port):
-    global ip, http_port, https_port
+    global ip, http_port, https_port, http_socket, https_socket
     ip = new_ip
     http_port = new_port
     https_port = new_port
+    http_socket = f'http://{ip}:{http_port}'
+    https_socket = f'https://{ip}:{https_port}'
     generate_command_dict()
 
 
@@ -409,7 +411,7 @@ def test_situation(port_str):
                 cmd_dict = command_sets[situation]['commands']
                 all_tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
                 tools = [item for item in all_tools.split(', ') if item not in disabled_cmd_dict]
-                print_with_intention(f'[i] Detected Port/Protocol: {port_str}/{situation.upper()}')
+                print_with_intention(f'[i] Detected Port & Protocol: ({port_str.upper()}/{situation.upper()})')
                 print_with_intention(f'[^] Testing port with Tools: `{tools}`')
                 for cmd, cmd_scan_type in cmd_dict.items():
                     if scan_type.upper() in cmd_scan_type:
