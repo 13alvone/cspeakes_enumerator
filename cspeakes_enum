@@ -297,7 +297,6 @@ def get_live_sockets():
     
     for port in port_list:
         potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
-        socket_updater(ip, port)
         for potential_socket, _protocol in potential_sockets.items():
             try:
                 socket_response = http_response(potential_socket)
@@ -399,19 +398,21 @@ def print_with_intention(_string, newline=True, tab=False):
     output_summary.append(_string)
 
 
-def test_situation(port_str):
-    global service_dict, suppression_list, scan_type, disabled_cmd_dict
+def test_protocol(port_str):
+    global service_dict, suppression_list, scan_type, disabled_cmd_dict, ip
     result = False
     command_sets = generate_command_dict()
     try:
-        situation = f'{service_dict[port_str]}'
+        protocol = f'{service_dict[port_str]}'
+        if protocol.lower() in ['http', 'https']:
+            socket_updater(ip, port_str)
         try:
-            tool_set = set(tool.split(" ")[0] for tool in command_sets[situation]['commands'])
+            tool_set = set(tool.split(" ")[0] for tool in command_sets[protocol]['commands'])
             try:
-                cmd_dict = command_sets[situation]['commands']
+                cmd_dict = command_sets[protocol]['commands']
                 all_tools = ", ".join(tool_set) if len(tool_set) > 1 else next(iter(tool_set))
                 tools = [item for item in all_tools.split(', ') if item not in disabled_cmd_dict]
-                print_with_intention(f'[i] Detected Port & Protocol: ({port_str.upper()}/{situation.upper()})')
+                print_with_intention(f'[i] Detected Port & Protocol: ({port_str.upper()}/{protocol.upper()})')
                 print_with_intention(f'[^] Testing port with Tools: `{tools}`')
                 for cmd, cmd_scan_type in cmd_dict.items():
                     if scan_type.upper() in cmd_scan_type:
@@ -420,12 +421,12 @@ def test_situation(port_str):
                             execute_os_command(cmd)
                         except Exception as e:
                             result = False
-                            print_with_intention(f'[!] Command set failure for protocol: `{situation.upper()}`')
+                            print_with_intention(f'[!] Command set failure for protocol: `{protocol.upper()}`')
                             print_with_intention(f'[*] Error: `{e}`')
                     else:
                         print_with_intention(f'[*] Command not in `{scan_type.upper()}` Scan Type: `{cmd}`')
             except Exception as e:
-                print_with_intention(f'[!] No command set defined for situation `{situation.upper()}`')
+                print_with_intention(f'[!] No command set defined for protocol `{protocol.upper()}`')
                 print_with_intention(f'Error: `{e}`')
         except Exception as e:
             print_with_intention(f'[!] No command set defined for port `{port_str}`')
@@ -466,18 +467,18 @@ def main():
 
     port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]
 
-    test_situation('initial')
-    test_situation('all')
+    test_protocol('initial')
+    test_protocol('all')
 
     # Test each identified socket.
     get_live_sockets()
     if socket_dict:
         for _, _port in socket_dict.items():
-            test_situation(f'{_port}')
+            test_protocol(f'{_port}')
 
     for _port in port_list:
         if service_dict[_port] not in ['http', 'https']:
-            test_situation(_port)
+            test_protocol(_port)
 
     # Write the output to the summary file for this run.
     f_out = open(f'{output_root_dir}/summary_{ip}', 'w')
