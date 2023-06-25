@@ -295,6 +295,7 @@ def get_live_sockets():
     
     for port in port_list:
         potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
+        socket_updater(ip, port)
         for potential_socket, _protocol in potential_sockets.items():
             try:
                 socket_response = http_response(potential_socket)
@@ -386,11 +387,11 @@ def print_with_intention(_string, newline=True, tab=False):
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
     # Error Details or Configuration Alert
     elif _string.startswith("[*] "):
-        print("\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
+        print("\t" + Fore.YELLOW + Back.RED + "[^]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
     # System Errors
     elif _string.startswith("[x] ") or _string.startswith("[X] "):
-        print("\t\t" + Fore.YELLOW + Back.RED + "[*]" + Back.RESET + Fore.RESET + " " +
+        print("\t\t" + Fore.YELLOW + Back.RED + "[x]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
     output_summary.append(_string)
@@ -463,11 +464,11 @@ def main():
     port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]
 
     test_situation('initial')
-    get_live_sockets()
     test_situation('all')
 
     # Test each identified socket.
     initial_result = False
+    get_live_sockets()
     if socket_dict:
         for _socket, _port in socket_dict.items():
             test_situation(f'{_port}')
