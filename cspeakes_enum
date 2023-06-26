@@ -308,7 +308,7 @@ def get_live_sockets():
                 print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
 
             except Exception as e:
-                print_with_intention(f'[*] Socket `{potential_socket}` failed to respond. Skipping...')
+                print_with_intention(f'[!] Socket `{potential_socket}` failed to respond. Skipping...')
                 print_with_intention(f'[x] Error Details: `{e}`')
                 continue
 
@@ -319,7 +319,7 @@ def execute_os_command(_cmd, _print=True, _print_et=True):
     for disabled_cmd, reason in disabled_cmd_dict.items():
         if disabled_cmd in _cmd:
             print_with_intention(f'[*] Command Disabled: `{_cmd}`')
-            print_with_intention(f'[x] Reason: `{reason}`')
+            print_with_intention(f'[*] Reason: `{reason}`', tab=True)
             return None, None
 
     for flagged_cmd in suppression_list:
@@ -348,7 +348,7 @@ def execute_os_command(_cmd, _print=True, _print_et=True):
         else:
             print_with_intention(f'[!] Execution Encountered an Error.')
             if stderr:
-                print_with_intention(f'[*] {stderr}')
+                print_with_intention(f'[x] Error Details: {stderr}')
             if _print_et:
                 print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
@@ -356,11 +356,11 @@ def execute_os_command(_cmd, _print=True, _print_et=True):
     except SystemExcecutionError as e:
         print_with_intention(f'[!] System Execution Error: `{e}`')
         print_with_intention(f'[x] Exiting due to system error or permissions issue.')
-        print_with_intention(f'[^] Ensure you are running in a shell and not an IDE.')
+        print_with_intention(f'[x] Ensure you are running in a shell and not an IDE.')
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure.')
-        print_with_intention(f'[*] {e}')
+        print_with_intention(f'[x] Error Details: {e}')
 
     if _print_et:
         print_elapsed_time()
@@ -390,11 +390,11 @@ def print_with_intention(_string, newline=True, tab=False):
               Style.RESET_ALL + Fore.WHITE + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
     # Error Details or Configuration Alert
     elif _string.startswith("[*] "):
-        print("\t" + Fore.YELLOW + Back.RED + "[^]" + Back.RESET + Fore.RESET + " " +
-              Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
+        print(_tab + "\t" + Fore.RED + Back.YELLOW + "[*]" + Back.RESET + Fore.RESET + " " +
+              Style.RESET_ALL + Fore.RED + Back.YELLOW + _string[4:] + Fore.RESET + Back.RESET + new_line)
     # System Errors
     elif _string.startswith("[x] ") or _string.startswith("[X] "):
-        print("\t\t" + Fore.YELLOW + Back.RED + "[x]" + Back.RESET + Fore.RESET + " " +
+        print(_tab + "\t\t" + Fore.YELLOW + Back.RED + "[x]" + Back.RESET + Fore.RESET + " " +
               Style.RESET_ALL + Fore.YELLOW + Back.RED + _string[4:] + Fore.RESET + Back.RESET + new_line)
 
     output_summary.append(_string)
@@ -429,9 +429,9 @@ def test_protocol(port_str):
                         except Exception as e:
                             result = False
                             print_with_intention(f'[!] Command set failure for protocol: `{protocol.upper()}`')
-                            print_with_intention(f'[*] Error: `{e}`')
+                            print_with_intention(f'[x] Error: `{e}`')
                     else:
-                        print_with_intention(f'[*] Command not in `{scan_type.upper()}` Scan Type: `{cmd}`')
+                        print_with_intention(f'[!] Command not in `{scan_type.upper()}` Scan Type: `{cmd}`')
             except Exception as e:
                 print_with_intention(f'[!] No command set defined for protocol `{protocol.upper()}`')
                 print_with_intention(f'Error: `{e}`')
