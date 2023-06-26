@@ -316,10 +316,10 @@ def get_live_sockets():
 def execute_os_command(_cmd, _print=True, _print_et=True):
     global args, suppression, suppression_list, disabled_cmd_dict, cmd_timeout
 
-    for disabled_cmd in disabled_cmd_dict:
+    for disabled_cmd, reason in disabled_cmd_dict.items():
         if disabled_cmd in _cmd:
-            msg = f'[*] Command Disabled: `{_cmd}`'
-            print_with_intention(msg)
+            print_with_intention(f'[*] Command Disabled: `{_cmd}`')
+            print_with_intention(f'[x] Reason: `{reason}`')
             return None, None
 
     for flagged_cmd in suppression_list:
