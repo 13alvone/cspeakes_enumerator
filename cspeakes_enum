@@ -26,7 +26,8 @@ suppression = ' >/dev/null 2>&1'                    # Suppression standard postf
 disabled_cmd_dict = {                               # <Tool>: <Reason_For_Disabled_State>
     'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
     'masscan': 'Disabled due to runtime.',
-    'nikto': 'Disabled due to OSCP requirements.'
+    'nikto': 'Disabled due to OSCP requirements.',
+    'gobuster': 'Disabled due to dirb largely resolving what is needed.'
 }
 
 
