@@ -403,14 +403,15 @@ def test_protocol(port_str):
     global service_dict, suppression_list, scan_type, disabled_cmd_dict, ip
     result = False
 
-    if protocol.lower() in ['http', 'https']:
-        socket_updater(ip, port_str)
-        print_with_intention(f'[^] Updated the socket to `{port_str}`')
-
-    command_sets = generate_command_dict()
-
     try:
         protocol = f'{service_dict[port_str]}'
+
+        if protocol.lower() in ['http', 'https']:
+            socket_updater(ip, port_str)
+            print_with_intention(f'[^] Updated the socket to `{port_str}`')
+
+        command_sets = generate_command_dict()
+
         try:
             tool_set = set(tool.split(" ")[0] for tool in command_sets[protocol]['commands'])
             try:
