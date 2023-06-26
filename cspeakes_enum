@@ -57,7 +57,7 @@ def get_args():
 script_path = os.path.abspath(__file__)
 script_dir = os.path.dirname(script_path)
 wordlist_root = 'wordlists'
-superuser = 'sudo '                 # Sudo Privs if required.
+superuser = 'sudo '     # Sudo Privs if required.
 port_list = []
 args = get_args()
 cmd_timeout = args.command_timeout
@@ -99,6 +99,7 @@ service_dict = {
     f'{smb_port}': 'smb',
     f'{snmp_port}': 'snmp',
     f'{https_port}': 'https',
+    '135': 'rpc',
     '445': 'smb',
     '1521': 'oracle',
     '3306': 'mysql',
@@ -401,11 +402,15 @@ def print_with_intention(_string, newline=True, tab=False):
 def test_protocol(port_str):
     global service_dict, suppression_list, scan_type, disabled_cmd_dict, ip
     result = False
+
+    if protocol.lower() in ['http', 'https']:
+        socket_updater(ip, port_str)
+        print_with_intention(f'[^] Updated the socket to `{port_str}`')
+
     command_sets = generate_command_dict()
+
     try:
         protocol = f'{service_dict[port_str]}'
-        if protocol.lower() in ['http', 'https']:
-            socket_updater(ip, port_str)
         try:
             tool_set = set(tool.split(" ")[0] for tool in command_sets[protocol]['commands'])
             try:
