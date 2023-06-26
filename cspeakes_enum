@@ -484,8 +484,9 @@ def main():
             test_protocol(f'{_port}')
 
     for _port in port_list:
-        if service_dict[_port] not in ['http', 'https']:
-            test_protocol(_port)
+        if _port in service_dict:
+            if service_dict[_port] not in ['http', 'https']:
+                test_protocol(_port)
 
     # Write the output to the summary file for this run.
     f_out = open(f'{output_root_dir}/summary_{ip}', 'w')
