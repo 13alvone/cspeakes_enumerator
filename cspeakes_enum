@@ -27,7 +27,6 @@ disabled_cmd_dict = {                               # <Tool>: <Reason_For_Disabl
     'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
     'masscan': 'Disabled due to runtime.',
     'nikto': 'Disabled due to OSCP requirements.',
-    'gobuster': 'Disabled due to dirb largely resolving what is needed.'
 }
 
 
@@ -151,8 +150,8 @@ def generate_command_dict():    # Dynamically generates command sets based on th
                 f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q '
                 f'| tee -a {output_root_dir}/dotdotpwn_summary': ['LONG', 'SHORT'],
                 f'nikto -h {http_socket} | tee -a {output_root_dir}/nikto_summary.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {http_socket} -w {wordlist_root}/small.txt '
-                f'-t 150 -x php,html,js  -s "200,204,301,302,307,403,401" | tee -a '
+                f'gobuster dir -u {http_socket} -w {wordlist_root}/directory-list-2.3-medium.txt '
+                f'-t 150 -s "200,204,301,302,307,403,401" | tee -a '
                 f'{output_root_dir}/gobuster_summary': ['LONG', 'SHORT'],
                 f'dirb {http_socket} {wordlist_root}/common.txt -x extensions.txt '
                 f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG'],
@@ -167,8 +166,8 @@ def generate_command_dict():    # Dynamically generates command sets based on th
                 f'{output_root_dir}/dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
                 f'nikto -h {https_socket.split(":")[0]} | tee -a '
                 f'{output_root_dir}/nikto_{https_filename}.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {https_socket} -w {wordlist_root}/small.txt '
-                f'-t 150 -k -x php,html,js  -s "200,204,301,302,307,403,401" | tee -a '
+                f'gobuster dir -u {https_socket} -w {wordlist_root}/directory-list-2.3-medium.txt '
+                f'-t 150 -k -s "200,204,301,302,307,403,401" | tee -a '
                 f'{output_root_dir}/gobuster_{https_filename}': ['LONG', 'SHORT'],
                 f'dirb {https_socket} {wordlist_root}/common.txt -x extensions.txt '
                 f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}': ['LONG'],
