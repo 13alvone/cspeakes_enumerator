@@ -26,19 +26,6 @@ chmod +x install.sh
 ./install.sh
 ```
 
-## Installation (Hard Way):
-
-For those who would rather do it line by line themselves, the following commands put everything in place on Kali: 
-
-```shell
-git clone https://github.com/13alvone/cspeakes_enumerator.git
-cd cspeakes_enumerator
-mv create_target.sh /usr/local/bin/
-chmod +x /usr/local/bin/create_target.sh
-echo 'alias target="/usr/local/bin/create_target.sh"' > ~/.zshrc
-source ~/.zshrc
-```
-
 ## Basic Execution:
 After installation, as shown above, the most abstracted command which uses everything you just installed can be called from anywhere in the terminal against a target IP such that: 
 ```shell
