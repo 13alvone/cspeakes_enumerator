@@ -9,7 +9,7 @@
 
 ### Kali Linux Aggregated Enumerator
 
-`cspeakes_enum` is a tool built to run on Kali Linux that completes some basic enumeration commands potentially useful during initial discovery. This is a very loud script that is typically used in CTF challenges such as those available on vulnhub.com and hackthebox.eu.
+`cspeakes_enum` is a tool built to run on Kali Linux that completes some basic enumeration commands potentially useful during initial pentest discovery. 
 
 ***Please Note:
  
@@ -20,7 +20,7 @@
 
 ## Installation (Easy Way):
 ```shell
-git clone <this_git_repo_url>
+git clone https://github.com/13alvone/cspeakes_enumerator.git
 cd cspeakes_enumerator
 chmod +x install.sh
 ./install.sh
@@ -31,7 +31,7 @@ chmod +x install.sh
 For those who would rather do it line by line themselves, the following commands put everything in place on Kali: 
 
 ```shell
-git clone <this_git_repo_url>
+git clone https://github.com/13alvone/cspeakes_enumerator.git
 cd cspeakes_enumerator
 mv create_target.sh /usr/local/bin/
 chmod +x /usr/local/bin/create_target.sh
