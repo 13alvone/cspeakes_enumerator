@@ -155,6 +155,7 @@ def generate_command_dict():    # Dynamically generates command sets based on th
                 f'{output_root_dir}/gobuster_summary': ['LONG', 'SHORT'],
                 f'dirb {http_socket} {wordlist_root}/common.txt -x extensions.txt '
                 f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG'],
+                f'gobuster vhost -u {http_socket} -w {wordlist_root}/subdomains-top1million-5000.txt': ['LONG', 'SHORT'],
             }
         },
 
@@ -174,6 +175,7 @@ def generate_command_dict():    # Dynamically generates command sets based on th
                 f'sslyze --regular {https_socket.replace("https://", "")} | tee -a '
                 f'{output_root_dir}/sslyze_{https_filename}': ['LONG', 'SHORT'],
                 f'tlssled {ip} {https_port} | tee -a {output_root_dir}/tlssled_{https_filename}': ['LONG', 'SHORT'],
+                f'gobuster vhost -u {https_socket} -w {wordlist_root}/subdomains-top1million-5000.txt': ['LONG', 'SHORT'],
             }
         },
 
