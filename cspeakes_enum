@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-import re
+
 import os
 import time
 import math
+import yaml
 import requests
 import argparse
 import subprocess
+
+from gobusterSummarizer import gobuster_formatter
 from pathlib import Path
 from colorama import Fore, Back, Style
-
 
 # Ridiculous, Obligatory Title
 obligatory_title = '''
@@ -21,9 +23,9 @@ obligatory_title = '''
 '''
 
 # User Configurations
-suppression_list = ['masscan', 'dotdotpwn', ]       # List of tools that should use a suppression
-suppression = ' >/dev/null 2>&1'                    # Suppression standard postfix
-disabled_cmd_dict = {                               # <Tool>: <Reason_For_Disabled_State>
+suppression_list = ['masscan', 'dotdotpwn', ]  # List of tools that should use a suppression
+suppression = ' >/dev/null 2>&1'  # Suppression standard postfix
+disabled_cmd_dict = {  # <Tool>: <Reason_For_Disabled_State>
     'dotdotpwn': 'Disabled due to inability to grep output or control it without user intervention.',
     'masscan': 'Disabled due to runtime.',
     'nikto': 'Disabled due to OSCP requirements.',
@@ -50,19 +52,21 @@ def get_args():
     parser.add_argument('-http', '--http_port', help='Target HTTP Port', default=80, type=int, required=False)
     parser.add_argument('-https', '--https_port', help='Target HTTPs Port', default=443, type=int, required=False)
     parser.add_argument('-nosudo', '--nosudo', help='Don\'t Initiate Sudo', action='store_true', default=False)
+    parser.add_argument('-lowexec', '--initial_nmap_only', help='Only output command file after short nmap port scan',
+                        action='store_true', default=False)
     return parser.parse_args()
 
 
 # Global Variables
-script_path = os.path.abspath(__file__)
-script_dir = os.path.dirname(script_path)
-wordlist_root = 'wordlists'
-superuser = 'sudo '     # Sudo Privs if required.
-port_list = []
 args = get_args()
+ip = args.ip
+script_path = '/'.join(os.path.abspath(__file__).split('/')[:-1])
+wordlist_root = '/usr/share/wordlists'
+output_root_dir = f"{os.getcwd()}/{ip}_results"
+superuser = 'sudo '
+port_list = []
 cmd_timeout = args.command_timeout
 scan_type = args.scan_type
-ip = args.ip
 rpc_port = args.rpc_port
 http_port = args.http_port
 https_port = args.https_port
@@ -74,7 +78,6 @@ pop_port = args.pop_port
 smb_port = args.smb_port
 snmp_port = args.snmp_port
 socket_dict = {}
-output_root_dir = f"{'/'.join(os.getcwd().split('/')[:-1])}/{ip}_results"
 http_socket = f'http://{ip}:{http_port}'
 http_filename = http_socket.replace('http://', '').replace('//', '').replace('/', '-')
 https_socket = f'https://{ip}:{https_port}'
@@ -82,6 +85,10 @@ https_filename = https_socket.replace('https://', '').replace('//', '').replace(
 original_start_time = time.time()
 current_process_time = time.time()
 initial_ports = ''
+command_sets_dict = {}
+commands_attempted = []
+formatted_command_msg_sent = False
+commands_ignored = []
 output_summary = []
 
 # Service / Port Definitions
@@ -107,138 +114,102 @@ service_dict = {
 
 
 # Command Sets
-def generate_command_dict():    # Dynamically generates command sets based on the provided and identified data.
-    global ip, port_list, rpc_port, http_port, https_port, http_socket, https_socket, http_filename, https_filename
-    global wordlist_root, output_root_dir, args, initial_ports
+def generate_command_dict(output_to_file=True):
+    global script_path, command_sets_dict
+    with open(os.path.join(script_path, 'command_sets.yaml'), 'r') as file:
+        command_sets_template = yaml.safe_load(file)
 
-    command_sets_dict = {
-        'initial': {
-            'commands': {
-                f'nmap -p{initial_ports} -sC -sV -O -A {ip} | tee -a {output_root_dir}/nmap_summary': ['LONG', 'SHORT'],
-                f'masscan -p U:1-65535 {ip} --rate=1000 | tee -a {output_root_dir}/masscan_summary': ['LONG', 'SHORT'],
-            }
-        },
-        
-        'dns': {
-            'commands': {
-                f'dig axfr {ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
-                f'nmap -n --script '
-                f'"(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport" '
-                f'{ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
-                f'dnsrecon -r {ip}/24 -n {ip} | tee -a {output_root_dir}/dns_summary': ['LONG', 'SHORT'],
-                f'dnsrecon -d {output_root_dir}/dns_summary_2 -a -n {ip}': ['LONG', 'SHORT'],
-            }
-        },
+    command_sets_dict = {}
 
-        'ftp': {
-            'commands': {
-                f'nmap --script ftp-* -p {args.ftp_port} {ip} | tee -a {output_root_dir}/ftp_summary':['LONG', 'SHORT'],
-            }
-        },
+    for service, data in command_sets_template.items():
+        command_sets_dict[service] = {'commands': {}}
+        for cmd, scan_types in data['commands'].items():
+            formatted_cmd = cmd.format(
+                ip=ip,
+                initial_ports=initial_ports,
+                output_root_dir=output_root_dir,
+                http_socket=http_socket,
+                https_socket=https_socket,
+                http_filename=http_filename,
+                https_filename=https_filename,
+                http_port=http_port,
+                https_port=https_port,
+                ftp_port=ftp_port,
+                ssh_port=ssh_port,
+                smtp_port=smtp_port,
+                dns_port=dns_port,
+                pop_port=pop_port,
+                smb_port=smb_port,
+                snmp_port=snmp_port,
+                rpc_port=rpc_port,
+                wordlist_root=wordlist_root,
+                script_path=script_path,
+                scan_type=scan_type
+            )
+            command_sets_dict[service]['commands'][formatted_cmd] = scan_types
 
-        'smtp': {
-            'commands': {
-                f'nmap –script smtp-commands,smtp-enum-users -p 25 {ip} '
-                f'| tee {output_root_dir}/smtp_summary': ['LONG', 'SHORT'],
-            }
-        },
+    if output_to_file:
+        write_all_commands(command_sets_dict, ip, output_root_dir, args)
 
-        'http': {
-            'commands': {
-                f'dirb {http_socket} {wordlist_root}/small.txt -x extensions.txt '
-                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG', 'SHORT'],
-                f'dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q '
-                f'| tee -a {output_root_dir}/dotdotpwn_summary': ['LONG', 'SHORT'],
-                f'nikto -h {http_socket} | tee -a {output_root_dir}/nikto_summary.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {http_socket} -w {wordlist_root}/directory-list-2.3-medium.txt '
-                f'-t 150 | tee -a '
-                f'{output_root_dir}/gobuster_summary': ['LONG', 'SHORT'],
-                f'dirb {http_socket} {wordlist_root}/common.txt -x extensions.txt '
-                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_summary': ['LONG'],
-                f'gobuster vhost -u {http_socket} -w {wordlist_root}/subdomains-top1million-5000.txt': ['LONG', 'SHORT'],
-            }
-        },
-
-        'https': {
-            'commands': {
-                f'dirb {https_socket} {wordlist_root}/small.txt -x extensions.txt '
-                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}': ['LONG'],
-                f'dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q | tee -a '
-                f'{output_root_dir}/dotdotpwn_{https_filename}': ['LONG', 'SHORT'],
-                f'nikto -h {https_socket.split(":")[0]} | tee -a '
-                f'{output_root_dir}/nikto_{https_filename}.txt': ['LONG', 'SHORT'],
-                f'gobuster dir -u {https_socket} -w {wordlist_root}/directory-list-2.3-medium.txt '
-                f'-t 150 -k | tee -a '
-                f'{output_root_dir}/gobuster_{https_filename}': ['LONG', 'SHORT'],
-                f'dirb {https_socket} {wordlist_root}/common.txt -x extensions.txt '
-                f'-r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}': ['LONG'],
-                f'sslyze --regular {https_socket.replace("https://", "")} | tee -a '
-                f'{output_root_dir}/sslyze_{https_filename}': ['LONG', 'SHORT'],
-                f'tlssled {ip} {https_port} | tee -a {output_root_dir}/tlssled_{https_filename}': ['LONG', 'SHORT'],
-                f'gobuster vhost -u {https_socket} -w {wordlist_root}/subdomains-top1million-5000.txt': ['LONG', 'SHORT'],
-            }
-        },
-
-        'cgi_bin': {
-            'commands': {
-                f'gobuster dir -u {http_socket}/cgi-bin/ -w {wordlist_root}/small.txt '
-                f'-s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 '
-                f'| tee -a {output_root_dir}/cgi-bin_summary': ['LONG', 'SHORT']
-            }
-        },
-
-        'rpc': {
-            'commands': {
-                f'rpcinfo -p {ip} | tee -a {output_root_dir}/rpc_summary': ['LONG', 'SHORT'],
-            }
-        },
-
-        'smb': {
-            'commands': {
-                f'nbtscan -r {ip} | tee -a {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
-                f'enum4linux -a {ip} | tee -a {output_root_dir}/smb_summary': ['LONG', 'SHORT'],
-                f'nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} | tee -a '
-                f'{output_root_dir}/smb_summary': ['LONG', 'SHORT'],
-                f'nmap {ip} --script smb-enum-domains.nse,smb-enum-groups.nse,'
-                f'smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,'
-                f'smb-mbenum.nse,smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,'
-                f'smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,'
-                f'smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,'
-                f'smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse | tee -a {output_root_dir}/smb_all': ['LONG', 'SHORT'],
-            }
-        },
-
-        'snmp': {
-            'commands': {
-                f'snmpwalk -c public -v1 {ip} | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
-                f'snmpcheck -t {ip} -c public | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
-                f'onesixtyone {ip} public | tee -a {output_root_dir}/snmp_summary': ['LONG', 'SHORT'],
-            }
-        },
-
-        'oracle': {
-            'commands': {
-                f'tnscmd10g version -h {ip} | tee -a {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
-                f'tmscmd10g status -h {ip} | tee -a {output_root_dir}/oracle_summary': ['LONG', 'SHORT'],
-            },
-        },
-
-        'mysql': {
-            'commands': {
-                f'nmap -sV -Pn -vv {ip} -p 3306 --script mysql-audit,mysql-databases,'
-                f'mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,'
-                f'mysql-variables,mysql-vuln-cve2012-2122 | tee -a {output_root_dir}/mysql_summary': ['LONG', 'SHORT'],
-            }
-        },
-
-        'all': {
-            'commands': {
-                f'nmap -nvv -Pn- -sSV -p {initial_ports} --version-intensity 9 -A {ip} | tee '
-                f'{output_root_dir}/intense_service_scan_summary': ['LONG', 'SHORT'],
-            }
-        },
-    }
     return command_sets_dict
+
+
+def find_gobuster_files(directory_path):
+    try:
+        # Ensure the provided path is a valid directory
+        if not os.path.isdir(directory_path):
+            print_with_intention("[x] Invalid directory path. Please provide a valid directory.")
+            return []
+
+        gobuster_file_paths = []
+
+        # Iterate through the files in the directory
+        for filename in os.listdir(directory_path):
+            # Check if the file starts with "gobuster_"
+            if filename.startswith("gobuster_") and os.path.isfile(os.path.join(directory_path, filename)):
+                # Get the directory path and add it to the list
+                file_directory = os.path.join(directory_path, filename)
+                gobuster_file_paths.append(file_directory)
+
+        return gobuster_file_paths
+
+    except Exception as e:
+        print_with_intention("[x] An error occurred: {}".format(str(e)))
+        return []
+
+
+def update_file_content(file_path, new_content):
+    """
+    Open a file, erase all contents, paste new contents, and save it.
+
+    :param file_path: The path to the file to be updated.
+    :param new_content: The content to be written to the file.
+    """
+    try:
+        with open(file_path, 'w') as file:
+            file.write(new_content)
+
+        print_with_intention("[i] File '{}' reformatted successfully.".format(file_path))
+
+    except Exception as e:
+        print_with_intention("[x] An error occurred: {}".format(str(e)))
+
+
+def write_all_commands(command_sets_dict, ip, output_root_dir, args):
+    global formatted_command_msg_sent
+    all_cmds_out_file = os.path.join(output_root_dir, 'all_commands')
+    if not formatted_command_msg_sent:
+        print_with_intention(f'[i] Outputting All Formatted Commands to: {all_cmds_out_file}')
+        formatted_command_msg_sent = True
+    with open(all_cmds_out_file, 'w') as file_out:
+        file_out.write(f'[+] All Command Options (COPY/PASTE)\n\n')
+        for service, command_list in command_sets_dict.items():
+            service_title = f'[-] Service: {service}'
+            file_out.write(f'{"*"*len(service_title)}\n{service_title}\n{"*"*len(service_title)}\n\n')
+            for _, commands in command_list.items():
+                for command in commands:
+                    file_out.write(f'{command}\n')
+            file_out.write('\n')
 
 
 def chmod(_path):
@@ -250,30 +221,32 @@ def chmod(_path):
 
 def build_dir_tree(_path):
     if os.path.exists(_path):
-        print_with_intention(f'[i] Results Path Already Exists: `{_path}`', 'info')
+        print_with_intention(f'[i] Results Path Already Exists: `{_path}`')
         return _path
     try:
         if _path[-1] == "/":
             Path(_path[:-1]).mkdir(parents=True)
         else:
             Path(_path).mkdir(parents=True)
-        print_with_intention(f'[+] Results Path Created: `{_path}`', 'good')
+        print_with_intention(f'[+] Results Path Created: `{_path}`')
         chmod(_path)
 
     except Exception as e:
-        print_with_intention(f'[!] Path Creation Error Details: `{e}`', 'bad')
+        print_with_intention(f'[!] Path Creation Error Details: `{e}`')
         return _path
     return _path
 
 
 def socket_updater(new_ip, new_port):
-    global ip, http_port, https_port, http_socket, https_socket
+    global ip, http_port, https_port, http_socket, https_socket, command_sets_dict
     ip = new_ip
     http_port = new_port
     https_port = new_port
     http_socket = f'http://{ip}:{http_port}'
     https_socket = f'https://{ip}:{https_port}'
-    generate_command_dict()
+
+    # Regenerate command sets with updated sockets
+    command_sets_dict = generate_command_dict()
 
 
 def print_elapsed_time():
@@ -285,7 +258,7 @@ def print_elapsed_time():
         remaining_seconds = f'0{remaining_seconds}'
     elapsed_time = f'{minutes}:{remaining_seconds}'
     msg = f'[^] Total_Time Elapsed: `{elapsed_time}`'
-    print_with_intention(msg, 'info')
+    print_with_intention(msg)
     return time.time()
 
 
@@ -295,9 +268,9 @@ def http_response(_url):
     return f"{r.status_code}", f"{content_type}"
 
 
-def get_live_sockets():
+def get_live_sockets(print_error=False):
     global ip, port_list, socket_dict, service_dict
-    
+
     for port in port_list:
         potential_sockets = {f'http://{ip}:{port}': 'http', f'https://{ip}:{port}': 'https'}
         for potential_socket, _protocol in potential_sockets.items():
@@ -309,18 +282,23 @@ def get_live_sockets():
                 print_with_intention(f'[^] Adding port `{port}` to the `{_protocol}` protocol/service.')
 
             except Exception as e:
-                print_with_intention(f'[!] Socket `{potential_socket}` failed to respond. Skipping...')
-                print_with_intention(f'[x] Error Details: `{e}`')
+                if print_error:
+                    print_with_intention(f'[i] Socket `{potential_socket}` failed to respond. Skipping...')
                 continue
 
 
 def execute_os_command(_cmd, _print=True, _print_et=True):
-    global args, suppression, suppression_list, disabled_cmd_dict, cmd_timeout
+    global args, suppression, suppression_list, disabled_cmd_dict, cmd_timeout, commands_attempted, commands_ignored
+
+    if _cmd not in commands_attempted:
+        commands_attempted.append(_cmd)
 
     for disabled_cmd, reason in disabled_cmd_dict.items():
         if disabled_cmd in _cmd:
             print_with_intention(f'[*] Command Disabled: `{_cmd}`')
             print_with_intention(f'[*] Reason: `{reason}`', tab=True)
+            if _cmd not in commands_ignored:
+                commands_ignored.append(_cmd)
             return None, None
 
     for flagged_cmd in suppression_list:
@@ -341,23 +319,24 @@ def execute_os_command(_cmd, _print=True, _print_et=True):
         if results.returncode == 0 and not results.stderr:
             if stdout:
                 print_with_intention(f'[^] {stdout}')
-            print_with_intention(f'[^] Execution Completed Successfully!')
+            print_with_intention(f'[+] Execution Completed Successfully!')
             if _print_et:
                 print_elapsed_time()
             return stdout, None
 
         else:
-            print_with_intention(f'[!] Execution Encountered an Error.')
+            if not _cmd.lower().strip().startswith('gobuster') and not _cmd.lower().strip().startswith('sudo gobuster'):
+                print_with_intention(f'[!] Execution Encountered an Error.')
             if stderr:
                 print_with_intention(f'[x] Error Details: {stderr}')
             if _print_et:
                 print_elapsed_time()
             return 'SystemExecutionError', results.stderr.decode()
 
-    except SystemExcecutionError as e:
+    except subprocess.SubprocessError as e:
         print_with_intention(f'[!] System Execution Error: `{e}`')
-        print_with_intention(f'[x] Exiting due to system error or permissions issue.')
-        print_with_intention(f'[x] Ensure you are running in a shell and not an IDE.')
+        print_with_intention(f'[x] Exiting due to system error or permissions issue. Ensure you are running in a '
+                             f'shell and not an IDE.')
 
     except Exception as e:
         print_with_intention(f'[!] General Execution Failure.')
@@ -432,7 +411,9 @@ def test_protocol(port_str):
                             print_with_intention(f'[!] Command set failure for protocol: `{protocol.upper()}`')
                             print_with_intention(f'[x] Error: `{e}`')
                     else:
-                        print_with_intention(f'[!] Command not in `{scan_type.upper()}` Scan Type: `{cmd}`')
+                        print_with_intention(f'[^] Command not in `{scan_type.upper()}` scan type, but is still '
+                                             f'a manual option (COPY/PASTE):')
+                        print(f'\t{cmd}\n')
             except Exception as e:
                 print_with_intention(f'[!] No command set defined for protocol `{protocol.upper()}`')
                 print_with_intention(f'Error: `{e}`')
@@ -459,12 +440,11 @@ def build_output_structure():
 
 
 def main():
-    global ip, output_summary, port_list, output_root_dir, socket_dict, initial_ports
-    generate_command_dict()
-    build_output_structure()
+    global ip, output_summary, port_list, output_root_dir, socket_dict, initial_ports, commands_attempted, \
+        commands_ignored, args
 
     # Begin testing on all components.
-    print_with_intention(f'[+] TARGET: `{ip}`', 'start')
+    print_with_intention(f'[+] TARGET: `{ip}`')
     print_with_intention(f'[i] Performing Initial Port Discovery. Please wait up to 5 minutes...')
     initial_ports = execute_os_command(f"nmap -p- --min-rate=1000 -T4 {ip} "
                                        f"| grep '^[0-9]' "
@@ -472,6 +452,13 @@ def main():
                                        f"| tr '\n' ',' "
                                        f"| sed s/,$//",
                                        _print=False, _print_et=False)[0]
+
+    build_output_structure()
+    generate_command_dict()
+    if args.initial_nmap_only:
+        print(f'[+] Initial light port scan completed.\n'
+              f'\tCommands file created: `{os.path.join(output_root_dir, "all_commands")}`\n\tExiting...')
+        exit(0)
 
     port_list = [x.strip() for x in initial_ports.split(",") if x.strip()]
 
@@ -494,6 +481,20 @@ def main():
     for summary_line in output_summary:
         f_out.write(f'{summary_line}\n')
     f_out.close()
+
+    for gobuster_path in find_gobuster_files(output_root_dir):
+        output = gobuster_formatter(gobuster_path)
+        update_file_content(gobuster_path, output)
+
+    with open(os.path.join(output_root_dir, 'commands_attempted'), 'w') as file_in:
+        file_in.write(f'[+] All Commands Attempted:\n\n')
+        for attempted_command in commands_attempted:
+            file_in.write(f'{attempted_command}\n\n')
+
+    with open(os.path.join(output_root_dir, 'commands_ignored'), 'w') as file_in:
+        file_in.write(f'[+] All Commands Skipped/Ignored:\n\n')
+        for ignored_command in commands_ignored:
+            file_in.write(f'{ignored_command}\n\n')
 
 
 if __name__ == '__main__':

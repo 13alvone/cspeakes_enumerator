@@ -1,0 +1,89 @@
+initial:
+  commands:
+    "masscan -p U:1-65535 {ip} --rate=1000 | tee -a {output_root_dir}/masscan_summary": ["LONG", "SHORT"]
+    "nmap -nv -Pn- -sSV -p{initial_ports} --version-intensity 9 -A {ip} | tee intense_service_scan_summary": ["LONG"]
+    "whois {ip} -h {dns_addr} | tee whois_summary": ["LONG"]  # Need to implement variable: dns_addr 
+    "host -t mx {domain_addr} | tee mx_record": ["LONG"]
+    "host -t txt {domain_addr} | tee txt_record": ["TBD"]
+    "for proto in $(cat {script_path}/protocols.txt); do host {proto}.{domain_addr}; done": ["TBD"]  # Bash one-liner to attempt to resolve each hostname
+    "for octet in $(seq 200 254); do host {start_ip_wo_last_octet}.{octet}; done | grep -v 'not found'": ["TBD"]  # Loop to scan IP addresses, filter out invalid results
+    "nc -nvv -w 1 -z {ip} {start_port}-{end_port} | tee nc_port_scan": ["RANGE", "TCP"]  # TCP Port Scan
+    "nc -nv -u -z -w 1 {ip} {start_port}-{end_port} | tee udp_nc_port_scan": ["RANGE", "UDP"]  # UDP Port Scan
+    "sudo nmap -sS -sU {ip} | tee nmap_syn_scan": ["SYN"]  # SYN Scan + UDP Scan - Don't complete the handshake, also run UDP
+    "nmap -sT {ip} | tee nmap_connect_scan": ["CONNECT"]  # Connect Scan - Full handhake completed. 
+    "nmap -sU {ip} | tee nmap_udp_scan": ["UDP"]  # UDP Scan
+    "nmap -sn {start_ip}-{end_ip} -oG all_hosts_up_lan": ["HOSTS"]  # Find any hosts that are found to be up.
+    "nmap -O {ip} --osscan-guess | tee nmap_osscan": ["SHORT"]  # Operating System enumeration
+
+dns:
+  commands:
+    "dig axfr {ip} | tee -a {output_root_dir}/dns_summary": ["LONG", "SHORT"]
+    "nmap -n --script '(default and *dns*) or fcrdns or dns-srv-enum or dns-random-txid or dns-random-srcport' {ip} | tee -a {output_root_dir}/dns_summary": ["LONG", "SHORT"]
+    "dnsrecon -r {ip}/24 -n {ip} | tee -a {output_root_dir}/dns_summary": ["LONG", "SHORT"]
+    "dnsrecon -d {domain} -a -n {ip} | tee -a {output_root_dir}/dns_summary": ["TBD"]
+    "dnsrecon -d {domain} -t std | tee -a {output_root_dir}/dns_summary": ["TBD"]  # Domain scan, STD (Standard) type
+    "dnsrecon -d {domain} -D {script_path}/protocols.txt -t brt": ["TBD"]  # Brute force protocol check
+    "dnsenum {domain} | tee dnsenum_summary": ["TBD"]  # Automate the DNS enumeration of the megacorpone.com domain
+
+ftp:
+  commands:
+    "nmap --script ftp-* -p {ftp_port} {ip} | tee -a {output_root_dir}/ftp_summary": ["LONG", "SHORT"]
+
+smtp:
+  commands:
+    "nmap –script smtp-commands,smtp-enum-users -p 25 {ip} | tee -a {output_root_dir}/smtp_summary": ["LONG", "SHORT"]
+
+http:
+  commands:
+    "dirb {http_socket} {wordlist_root}/dirb/small.txt -x {script_path}/extensions.txt -r -l -S -i -f | tee -a {output_root_dir}/dirb_summary": ["LONG", "SHORT"]
+    "dirb {http_socket} {wordlist_root}/dirb/common.txt -x {script_path}/extensions.txt -r -l -S -i -f | tee -a {output_root_dir}/dirb_summary": ["LONG"]
+    "dotdotpwn -d 6 -m http -h {ip} -x {http_port} -b -q | tee -a {output_root_dir}/dotdotpwn_summary": ["LONG", "SHORT"]
+    "nikto -h {http_socket} | tee -a {output_root_dir}/nikto_summary.txt": ["LONG", "SHORT"]
+    "gobuster --no-error dir -u {http_socket} -w {wordlist_root}/dirbuster/directory-list-2.3-medium.txt -t 150 | tee -a {output_root_dir}/gobuster_medium": ["LONG", "SHORT"]
+    "gobuster dir -u {http_socket} -w {wordlist_root}/SecLists-master/Discovery/Web-Content/big.txt -x 'php,html,htm,/' -r | tee -a {output_root_dir}/gobuster_big": ["LONG"]
+    "gobuster vhost -u {http_socket} -w {wordlist_root}/subdomains-top1million-5000.txt | tee -a {output_root_dir}/gobuster_vhost": ["LONG"]
+
+https:
+  commands:
+    "dirb {https_socket} {wordlist_root}/dirb/small.txt -x {script_path}/extensions.txt -r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}": ["LONG"]
+    "dotdotpwn -d 6 -m http -h {ip} -x {https_port} -b -S -q | tee -a {output_root_dir}/dotdotpwn_{https_filename}": ["LONG", "SHORT"]
+    "nikto -h {https_socket} | tee -a {output_root_dir}/nikto_{https_filename}.txt": ["LONG", "SHORT"]
+    "gobuster dir -u {https_socket} -w {wordlist_root}/dirbuster/directory-list-2.3-medium.txt -t 150 -k | tee -a {output_root_dir}/gobuster_{https_filename}": ["LONG", "SHORT"]
+    "dirb {https_socket} {wordlist_root}/dirb/common.txt -x {script_path}/extensions.txt -r -l -S -i -f | tee -a {output_root_dir}/dirb_{https_filename}": ["LONG"]
+    "sslyze {ip}:{https_port} | tee -a {output_root_dir}/sslyze_{https_filename}": ["LONG", "SHORT"]
+    "tlssled {ip} {https_port} | tee -a {output_root_dir}/tlssled_{https_filename}": ["LONG", "SHORT"]
+    "gobuster vhost -u {https_socket} -w {wordlist_root}/subdomains-top1million-5000.txt | tee -a {output_root_dir}/gobuster_vhost": ["LONG"]
+
+cgi_bin:
+  commands:
+    "gobuster dir -u {http_socket}/cgi-bin/ -w {wordlist_root}/dirb/small.txt -s 302,307,200,204,301,403 -x sh,pl,py,ps -t 150 | tee -a {output_root_dir}/cgi-bin_summary": ["LONG", "SHORT"]
+
+rpc:
+  commands:
+    "rpcinfo -p {ip} | tee -a {output_root_dir}/rpc_summary": ["LONG", "SHORT"]
+
+smb:
+  commands:
+    "nbtscan -r {ip} | tee -a {output_root_dir}/smb_summary": ["LONG", "SHORT"]
+    "enum4linux -a {ip} | tee -a {output_root_dir}/smb_summary": ["LONG", "SHORT"]
+    "nmap -sU -sS --script=smb-enum-users -p U:137,T:139 {ip} | tee -a {output_root_dir}/smb_summary": ["LONG", "SHORT"]
+    "nmap {ip} --script smb-enum-domains.nse,smb-enum-groups.nse,smb-enum-processes.nse,smb-enum-sessions.nse,smb-enum-shares.nse,smb-enum-users.nse,smb-ls.nse,smb-mbenum.nse,smb-os-discovery.nse,smb-print-text.nse,smb-psexec.nse,smb-security-mode.nse,smb-server-stats.nse,smb-system-info.nse,smb-vuln-conficker.nse,smb-vuln-cve2009-3103.nse,smb-vuln-ms06-025.nse,smb-vuln-ms07-029.nse,smb-vuln-ms08-067.nse,smb-vuln-ms10-054.nse,smb-vuln-ms10-061.nse,smb-vuln-regsvc-dos.nse | tee -a {output_root_dir}/smb_all": ["LONG", "SHORT"]
+
+snmp:
+  commands:
+    "snmpwalk -c public -v1 {ip} | tee -a {output_root_dir}/snmp_summary": ["LONG", "SHORT"]
+    "snmpcheck -t {ip} -c public | tee -a {output_root_dir}/snmp_summary": ["LONG", "SHORT"]
+    "onesixtyone {ip} public | tee -a {output_root_dir}/snmp_summary": ["LONG", "SHORT"]
+
+oracle:
+  commands:
+    "tnscmd10g version -h {ip} | tee -a {output_root_dir}/oracle_summary": ["LONG", "SHORT"]
+    "tmscmd10g status -h {ip} | tee -a {output_root_dir}/oracle_summary": ["LONG", "SHORT"]
+
+mysql:
+  commands:
+    "nmap -sV -Pn -vv {ip} -p 3306 --script mysql-audit,mysql-databases,mysql-dump-hashes,mysql-empty-password,mysql-enum,mysql-info,mysql-query,mysql-users,mysql-variables,mysql-vuln-cve2012-2122 | tee -a {output_root_dir}/mysql_summary": ["LONG", "SHORT"]
+
+all:
+  commands:
+    "nmap -p{initial_ports} -sC -sV -O -A {ip} | tee -a {output_root_dir}/nmap_summary": ["LONG", "SHORT"]
